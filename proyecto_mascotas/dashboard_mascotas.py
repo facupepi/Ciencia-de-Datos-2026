@@ -1333,7 +1333,11 @@ class Dashboard(tk.Tk):
     # ── Insights / Conclusiones cruzadas ───────────────────────────────────
     def _draw_insights(self):
         df = self.df
+        # ax_id → texto tooltip; poblado dentro de build
+        _ax_tooltips = {}
+
         def build(fig):
+            _ax_tooltips.clear()
             if len(df) == 0:
                 fig.text(0.5, 0.5, "Sin datos con los filtros aplicados",
                          ha="center", va="center", color=FG_TEXT, fontsize=14)
@@ -1343,7 +1347,6 @@ class Dashboard(tk.Tk):
             col_solo = next((c for c in df.columns if c.startswith("Vive_Salen_solos")), None)
             col_id   = next((c for c in df.columns if c.startswith("Vive_Tienen")), None)
 
-            # === Cálculos clave ===
             sin_cast = df["Mascota_Castrada"] == "No"
             sale = (pd.to_numeric(df[col_solo], errors="coerce").fillna(0) == 1) if col_solo else pd.Series([False]*n, index=df.index)
             sin_id = (pd.to_numeric(df[col_id], errors="coerce").fillna(0) == 0) if col_id else pd.Series([False]*n, index=df.index)
@@ -1351,20 +1354,11 @@ class Dashboard(tk.Tk):
             n_triple = int(triple_riesgo.sum())
             pct_triple = n_triple / n * 100
 
-            # Convertibles fáciles: sabe que es gratis pero NO castró
             sabe = df["Sabe_Castracion_Gratuita"] == "Si"
-            convertibles = sabe & sin_cast
-            n_conv = int(convertibles.sum())
+            n_conv = int((sabe & sin_cast).sum())
+            n_noinf = int(((df["Sabe_Castracion_Gratuita"] == "No") & sin_cast).sum())
+            n_ok = int((~sin_cast).sum())
 
-            # No informados: NO sabe + NO castró → necesitan campaña informativa
-            no_inf = (df["Sabe_Castracion_Gratuita"] == "No") & sin_cast
-            n_noinf = int(no_inf.sum())
-
-            # Ya OK: castrados
-            ok = ~sin_cast
-            n_ok = int(ok.sum())
-
-            # Camadas potenciales: hembras no castradas (perras + gatas) × 2 camadas/año × 4 crías
             no_cast_df = df[sin_cast]
             def _safe_sum(col):
                 if col not in no_cast_df.columns:
@@ -1373,13 +1367,9 @@ class Dashboard(tk.Tk):
             hembras_riesgo = _safe_sum("Perros_Hembra") + _safe_sum("Gatos_Hembra")
             camadas_anio = int(hembras_riesgo * 2 * 4)
 
-            # Brecha vacuna/desparasitación
             no_vac_no_des = ((df.get("Vacunadas") == "No") & (df.get("Desparasitadas") == "No")).sum()
             pct_no_vac_no_des = no_vac_no_des / n * 100
 
-            # === Layout: 2x2 con texto explicativo ===
-
-            # Helper: fondo "tarjeta" para los paneles de texto/KPI
             def _card(ax, color=BG_CARD, border_color=BORDER, border_width=1.2):
                 ax.set_facecolor(color)
                 for spine in ax.spines.values():
@@ -1391,33 +1381,31 @@ class Dashboard(tk.Tk):
             # ── 1) Hogares Críticos (triple riesgo) ──
             ax1 = fig.add_subplot(2, 2, 1)
             _card(ax1, color="#fff5f5", border_color=RED, border_width=2.0)
-            ax1.set_title("  ▲  Hogares de TRIPLE riesgo",
+            ax1.set_title("[!] Hogares de TRIPLE riesgo",
                           fontsize=12, fontweight="bold",
                           color=RED, loc="left", pad=10,
                           bbox=dict(facecolor="#fde8e8", edgecolor="none",
                                     boxstyle="round,pad=0.3"))
-            ax1.text(0.05, 0.63, f"{n_triple}", fontsize=54, fontweight="bold",
-                     color=RED, transform=ax1.transAxes, va="center")
-            ax1.text(0.43, 0.74, f"de {n} hogares",
-                     fontsize=11, color=FG_TEXT, transform=ax1.transAxes)
-            ax1.text(0.43, 0.60, f"({pct_triple:.1f}%)",
-                     fontsize=15, fontweight="bold", color=RED,
-                     transform=ax1.transAxes)
-            explic = ("Combinan los 3 riesgos a la vez:\n"
-                      "  •  Mascota SIN castrar\n"
-                      "  •  Sale sola a la calle\n"
-                      "  •  Sin chapita/microchip\n\n"
-                      "→  Población PRIORITARIA para campañas\n"
-                      "    de castración + identificación.")
-            ax1.text(0.05, 0.37, explic, fontsize=9, color=FG_TEXT,
-                     transform=ax1.transAxes, va="top", linespacing=1.6)
+            ax1.text(0.50, 0.66, f"{n_triple}", fontsize=64, fontweight="bold",
+                     color=RED, transform=ax1.transAxes, va="center", ha="center")
+            ax1.text(0.50, 0.30, f"{pct_triple:.1f}%  de los hogares",
+                     fontsize=14, fontweight="bold", color=FG_TEXT,
+                     transform=ax1.transAxes, va="center", ha="center")
+            _ax_tooltips[id(ax1)] = (
+                "Combinan los 3 riesgos a la vez:\n"
+                "  - Mascota SIN castrar\n"
+                "  - Sale sola a la calle\n"
+                "  - Sin chapita/microchip\n\n"
+                "=> Poblacion PRIORITARIA para campanas\n"
+                "   de castracion + identificacion."
+            )
 
             # ── 2) Segmentación accionable (donut) ──
             ax2 = fig.add_subplot(2, 2, 2)
             seg_vals = [n_ok, n_conv, n_noinf]
             seg_lbls = ["Ya OK (castrados)",
-                        "Convertibles fáciles\n(sabe gratis, no castró)",
-                        "Necesitan info\n(no sabe, no castró)"]
+                        "Convertibles faciles\n(sabe gratis, no castro)",
+                        "Necesitan info\n(no sabe, no castro)"]
             seg_cols = [GREEN, YELLOW, RED]
             wedges, _texts, autotexts = ax2.pie(
                 seg_vals, autopct="%1.0f%%", colors=seg_cols,
@@ -1426,7 +1414,7 @@ class Dashboard(tk.Tk):
                 wedgeprops={"edgecolor": BG_PANEL, "linewidth": 3, "width": 0.42})
             ax2.text(0, 0, f"{n}\nhogares", ha="center", va="center",
                      fontsize=11, fontweight="bold", color=FG_TEXT)
-            ax2.set_title("Segmentación accionable de la población",
+            ax2.set_title("Segmentacion accionable de la poblacion",
                           fontsize=12, fontweight="bold", pad=8)
             ax2.legend(wedges, seg_lbls, loc="center left",
                        bbox_to_anchor=(1.02, 0.5),
@@ -1435,37 +1423,35 @@ class Dashboard(tk.Tk):
             # ── 3) Camadas potenciales ──
             ax3 = fig.add_subplot(2, 2, 3)
             _card(ax3, color="#f0faf9", border_color=ACCENT, border_width=2.0)
-            ax3.set_title("  ⚠  Reproducción potencial sin intervención",
+            ax3.set_title("[>>] Reproduccion potencial sin intervencion",
                           fontsize=12, fontweight="bold", color=ACCENT,
                           loc="left", pad=10,
                           bbox=dict(facecolor="#d8f3ee", edgecolor="none",
                                     boxstyle="round,pad=0.3"))
-            ax3.text(0.05, 0.61, f"~{camadas_anio:,}".replace(",", "."),
-                     fontsize=48, fontweight="bold", color=ACCENT,
-                     transform=ax3.transAxes, va="center")
-            ax3.text(0.05, 0.43, "nuevos cachorros / gatitos por año",
-                     fontsize=10, color=FG_TEXT, transform=ax3.transAxes,
-                     fontweight="bold")
-            explic2 = (f"Estimado a partir de {int(hembras_riesgo)} hembras sin castrar\n"
-                       "× 2 camadas/año × 4 crías promedio.\n\n"
-                       "Cada año sin campaña masiva = más animales en\n"
-                       "situación de calle, abandono y riesgo sanitario.")
-            ax3.text(0.05, 0.33, explic2, fontsize=9, color=FG_TEXT,
-                     transform=ax3.transAxes, va="top", linespacing=1.6)
+            ax3.text(0.50, 0.66, f"~{camadas_anio:,}".replace(",", "."),
+                     fontsize=56, fontweight="bold", color=ACCENT,
+                     transform=ax3.transAxes, va="center", ha="center")
+            ax3.text(0.50, 0.30, "nuevos cachorros / gatitos por ano",
+                     fontsize=11, fontweight="bold", color=FG_TEXT,
+                     transform=ax3.transAxes, va="center", ha="center")
+            _ax_tooltips[id(ax3)] = (
+                f"Estimado a partir de {int(hembras_riesgo)} hembras sin castrar\n"
+                "x 2 camadas/ano x 4 crias promedio.\n\n"
+                "Cada ano sin campana masiva = mas animales en\n"
+                "situacion de calle, abandono y riesgo sanitario."
+            )
 
             # ── 4) Top 10 barrios con más hogares críticos ──
             ax4 = fig.add_subplot(2, 2, 4)
             if n_triple > 0:
                 top_b = df.loc[triple_riesgo, "Barrio"].value_counts().head(10).sort_values()
-                # Degradado de claro a oscuro para jerarquía visual
                 n_bars = len(top_b)
-                intensities = [0.35 + 0.55 * (i / max(n_bars - 1, 1))
-                               for i in range(n_bars)]
+                intensities = [0.35 + 0.55 * (i / max(n_bars - 1, 1)) for i in range(n_bars)]
                 colors4 = plt.get_cmap("Reds")(intensities)
-                bars4 = ax4.barh(top_b.index, top_b.values,
-                                 color=colors4, edgecolor=BG_PANEL,
-                                 linewidth=0.8, height=0.62)
-                ax4.set_title("Barrios con más hogares de triple riesgo",
+                ax4.barh(top_b.index, top_b.values,
+                         color=colors4, edgecolor=BG_PANEL,
+                         linewidth=0.8, height=0.62)
+                ax4.set_title("Barrios con mas hogares de triple riesgo",
                               fontsize=12, fontweight="bold")
                 ax4.set_xlabel("Cantidad de hogares", fontsize=9)
                 ax4.tick_params(axis="y", labelsize=9)
@@ -1480,14 +1466,86 @@ class Dashboard(tk.Tk):
                          ha="center", va="center", fontsize=12, color=FG_TEXT,
                          transform=ax4.transAxes)
 
-            # Pie de página con dato extra
             fig.text(0.5, 0.01,
                      f"[!] Brecha sanitaria: {pct_no_vac_no_des:.0f}% de los hogares "
                      f"no vacuna NI desparasita a sus mascotas.",
                      ha="center", fontsize=9, color=FG_TEXT, style="italic")
-            fig.subplots_adjust(left=0.06, right=0.82, top=0.94,
-                                bottom=0.07, hspace=0.44, wspace=0.35)
+
         self._redraw_fig("Insights", build)
+
+        # ── Tooltip Tkinter sobre ax1/ax3, igual que los KPIs ──
+        canvas = self.tab_canvases["Insights"]
+        if hasattr(self, "_insights_hover_cid"):
+            try:
+                canvas.mpl_disconnect(self._insights_hover_cid)
+            except Exception:
+                pass
+        if hasattr(self, "_insights_tip") and self._insights_tip is not None:
+            try:
+                self._insights_tip.destroy()
+            except Exception:
+                pass
+            self._insights_tip = None
+
+        _tip_state = {"win": None, "ax_id": None, "after_id": None}
+
+        def _tip_show(text, rx, ry):
+            if _tip_state["win"] is not None:
+                return
+            win = tk.Toplevel(self)
+            win.wm_overrideredirect(True)
+            win.wm_geometry(f"+{rx+16}+{ry+16}")
+            win.configure(bg="#1f3a5f")
+            tk.Label(win, text=text, justify="left",
+                     bg="#1f3a5f", fg="#ffffff",
+                     font=("Segoe UI", 9), padx=12, pady=8,
+                     borderwidth=1, relief="solid").pack()
+            _tip_state["win"] = win
+            self._insights_tip = win
+
+        def _tip_hide():
+            if _tip_state["after_id"] is not None:
+                try:
+                    self.after_cancel(_tip_state["after_id"])
+                except Exception:
+                    pass
+                _tip_state["after_id"] = None
+            if _tip_state["win"] is not None:
+                try:
+                    _tip_state["win"].destroy()
+                except Exception:
+                    pass
+                _tip_state["win"] = None
+                self._insights_tip = None
+            _tip_state["ax_id"] = None
+
+        def _on_hover(event):
+            if event.inaxes is None:
+                _tip_hide()
+                return
+            ax_id = id(event.inaxes)
+            text = _ax_tooltips.get(ax_id)
+            if text is None:
+                _tip_hide()
+                return
+            if _tip_state["ax_id"] == ax_id:
+                # Mover tooltip con el cursor
+                if _tip_state["win"] is not None:
+                    try:
+                        rx = self.winfo_pointerx()
+                        ry = self.winfo_pointery()
+                        _tip_state["win"].wm_geometry(f"+{rx+16}+{ry+16}")
+                    except Exception:
+                        pass
+                return
+            _tip_hide()
+            _tip_state["ax_id"] = ax_id
+            rx = self.winfo_pointerx()
+            ry = self.winfo_pointery()
+            _tip_state["after_id"] = self.after(
+                300, lambda t=text, x=rx, y=ry: _tip_show(t, x, y))
+
+        self._insights_hover_cid = canvas.mpl_connect("motion_notify_event", _on_hover)
 
     # ── Salud Pública / Zoonosis ───────────────────────────────────────────
     def _draw_salud(self):
@@ -1624,11 +1682,11 @@ class Dashboard(tk.Tk):
             def _s(c): return float(pd.to_numeric(no_cast[c], errors="coerce").fillna(0).sum()) if c in no_cast.columns else 0.0
             ph, pm = _s("Perros_Hembra"), _s("Perros_Macho")
             gh, gm = _s("Gatos_Hembra"),  _s("Gatos_Macho")
-            cats = ["Perros\n♀", "Perros\n♂", "Gatos\n♀", "Gatos\n♂"]
+            cats = ["Perros\n(hembra)", "Perros\n(macho)", "Gatos\n(hembra)", "Gatos\n(macho)"]
             vals = [ph, pm, gh, gm]
             cols_b = [RED, ACCENT, RED, ACCENT]
             bars = ax4.bar(cats, vals, color=cols_b, edgecolor=BG_PANEL)
-            ax4.set_title("Animales SIN castrar por sexo\n(las ♀ generan camadas)",
+            ax4.set_title("Animales SIN castrar por sexo\n(las hembras generan camadas)",
                           fontsize=11, fontweight="bold")
             ax4.set_ylabel("Cantidad")
             for b, v in zip(bars, vals):
