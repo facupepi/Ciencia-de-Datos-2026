@@ -1,0 +1,21 @@
+﻿variable,tipo,descripcion
+id_estudiante,texto,Identificador anónimo del estudiante
+edad,numérico,Edad en años
+genero,categórico,Género declarado
+tipo_secundaria,categórico,Tipo de escuela secundaria de procedencia
+distancia_km,numérico,Distancia aproximada desde el domicilio a la universidad
+trabaja,categórico,Situación laboral durante la cursada
+horas_trabajo_semana,numérico,Horas de trabajo semanales
+beca,categórico,Indica si recibe beca
+calidad_internet,categórico,Percepción de la calidad del acceso a internet
+asistencia_pct,numérico,Porcentaje de asistencia a clases
+uso_campus_virtual_pct,numérico,Porcentaje de uso del campus virtual
+promedio_parciales,numérico,Promedio general de parciales del primer semestre
+materias_aprobadas_1er_sem,numérico,Cantidad de materias aprobadas en el primer semestre
+materias_reprobadas_1er_sem,numérico,Cantidad de materias reprobadas en el primer semestre
+primera_generacion_universitaria,categórico,Indica si es primera generación universitaria
+participo_curso_orientacion,categórico,Indica si realizó curso de orientación / ingreso
+uso_tutorias,categórico,Frecuencia de uso de tutorías académicas
+situacion_economica_percibida,categórico,Percepción de la situación económica del hogar
+abandono_al_final_del_ano,categórico,Variable objetivo simulada: abandono al final del año
+nivel_riesgo_estimado,categórico,Etiqueta auxiliar simulada para análisis exploratorio
