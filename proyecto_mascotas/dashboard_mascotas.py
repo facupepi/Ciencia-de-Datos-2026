@@ -1275,7 +1275,7 @@ class Dashboard(tk.Tk):
             # Layout: arriba 2 paneles + abajo 1 panel ancho
             # (eliminado el duplicado del % castración por conocimiento
             #  — ya está en la pestaña Castración)
-            gs = fig.add_gridspec(2, 2, height_ratios=[1, 1], hspace=0.45, wspace=0.35)
+            gs = fig.add_gridspec(2, 2, height_ratios=[1, 1], hspace=0.30, wspace=0.25)
 
             # 1) % Sabe gratuita: castrados vs no castrados
             ax1 = fig.add_subplot(gs[0, 0])
@@ -1487,7 +1487,7 @@ class Dashboard(tk.Tk):
                 pass
             self._insights_tip = None
 
-        _tip_state = {"win": None, "ax_id": None, "after_id": None}
+        _tip_state: dict = {"win": None, "ax_id": None, "after_id": None}
 
         def _tip_show(text, rx, ry):
             if _tip_state["win"] is not None:
@@ -1558,7 +1558,7 @@ class Dashboard(tk.Tk):
             n = len(df)
 
             # Layout: arriba matriz 2x2, abajo panel ancho de brecha sanitaria
-            gs = fig.add_gridspec(2, 1, height_ratios=[1, 1], hspace=0.45)
+            gs = fig.add_gridspec(2, 1, height_ratios=[1, 1], hspace=0.30)
 
             # 1) Cruz vacunación × desparasitación (matriz 2×2)
             ax1 = fig.add_subplot(gs[0])
@@ -1616,8 +1616,12 @@ class Dashboard(tk.Tk):
                          ha="center", va="center", color=FG_TEXT, fontsize=14)
                 return
 
+            # Layout 2×2: hspace ajustado para que los títulos no se peguen
+            # al gráfico vecino pero sin desperdiciar espacio vertical.
+            gs = fig.add_gridspec(2, 2, hspace=0.30, wspace=0.25)
+
             # 1) Castración por tamaño de familia
-            ax1 = fig.add_subplot(2, 2, 1)
+            ax1 = fig.add_subplot(gs[0, 0])
             if "Integrantes_Familia" in df.columns:
                 tmp = df.copy()
                 tmp["_int"] = pd.to_numeric(tmp["Integrantes_Familia"], errors="coerce")
@@ -1629,16 +1633,16 @@ class Dashboard(tk.Tk):
                 bars = ax1.bar([str(x) for x in g.index], g.values,
                                color=ACCENT, edgecolor=BG_PANEL)
                 ax1.set_title("% castración según tamaño de familia",
-                              fontsize=11, fontweight="bold")
+                              fontsize=11, fontweight="bold", pad=8)
                 ax1.set_xlabel("Integrantes por hogar")
-                ax1.set_ylabel("% castradas"); ax1.set_ylim(0, 110)
+                ax1.set_ylabel("% castradas"); ax1.set_ylim(0, 115)
                 for b, v in zip(bars, g.values):
                     ax1.text(b.get_x() + b.get_width() / 2, v + 1.5,
                              f"{v:.0f}%", ha="center", fontsize=9,
                              fontweight="bold", color=FG_TEXT)
 
             # 2) Densidad: mascotas por persona, según tipo de vivienda
-            ax2 = fig.add_subplot(2, 2, 2)
+            ax2 = fig.add_subplot(gs[0, 1])
             if "Integrantes_Familia" in df.columns and "Total_Mascotas" in df.columns:
                 tmp = df.copy()
                 tmp["_int"] = pd.to_numeric(tmp["Integrantes_Familia"], errors="coerce")
@@ -1647,29 +1651,35 @@ class Dashboard(tk.Tk):
                 tmp = tmp[tmp["_int"] > 0]
                 tmp["dens"] = tmp["_tot"] / tmp["_int"]
                 g = tmp.groupby("Tipo_Vivienda")["dens"].mean().sort_values()
-                bars = ax2.barh(g.index, g.values, color=PURPLE, edgecolor=BG_PANEL)
-                ax2.set_title("Mascotas por persona, según vivienda",
-                              fontsize=11, fontweight="bold")
-                ax2.set_xlabel("Mascotas / integrante")
-                for i, v in enumerate(g.values):
-                    ax2.text(v + 0.02, i, f"{v:.2f}", va="center",
-                             fontsize=9, fontweight="bold", color=FG_TEXT)
+                if len(g) > 0:
+                    bars = ax2.barh(g.index, g.values, color=PURPLE, edgecolor=BG_PANEL)
+                    ax2.set_title("Mascotas por persona, según vivienda",
+                                  fontsize=11, fontweight="bold", pad=8)
+                    ax2.set_xlabel("Mascotas / integrante")
+                    ax2.set_xlim(0, max(g.values) * 1.20)
+                    for i, v in enumerate(g.values):
+                        ax2.text(v + max(g.values) * 0.02, i, f"{v:.2f}",
+                                 va="center", fontsize=9, fontweight="bold",
+                                 color=FG_TEXT)
 
             # 3) Hogares con MUCHAS mascotas (≥4) por barrio
-            ax3 = fig.add_subplot(2, 2, 3)
+            ax3 = fig.add_subplot(gs[1, 0])
             if "Total_Mascotas" in df.columns:
                 tmp = df.copy()
                 tmp["_tot"] = pd.to_numeric(tmp["Total_Mascotas"], errors="coerce").fillna(0)
                 muchos = tmp[tmp["_tot"] >= 4]
                 if len(muchos) > 0:
-                    top = muchos["Barrio"].value_counts().head(10).sort_values()
+                    # Limitamos a 6 barrios para que el panel quede compacto
+                    top = muchos["Barrio"].value_counts().head(6).sort_values()
                     ax3.barh(top.index, top.values, color=YELLOW, edgecolor=BG_PANEL)
-                    ax3.set_title("Hogares con ≥4 mascotas\n(posible acumulación)",
-                                  fontsize=11, fontweight="bold")
+                    ax3.set_title("Hogares con ≥4 mascotas (posible acumulación)",
+                                  fontsize=11, fontweight="bold", pad=8)
                     ax3.set_xlabel("Cantidad de hogares")
+                    ax3.set_xlim(0, max(top.values) * 1.20)
                     for i, v in enumerate(top.values):
-                        ax3.text(v + 0.1, i, f"{int(v)}", va="center",
-                                 fontsize=9, fontweight="bold", color=FG_TEXT)
+                        ax3.text(v + max(top.values) * 0.02, i, f"{int(v)}",
+                                 va="center", fontsize=9, fontweight="bold",
+                                 color=FG_TEXT)
                 else:
                     ax3.axis("off")
                     ax3.text(0.5, 0.5, "Sin hogares con ≥4 mascotas\nen el filtro actual",
@@ -1677,7 +1687,7 @@ class Dashboard(tk.Tk):
                              transform=ax3.transAxes)
 
             # 4) Hembras vs machos sin castrar (potencial reproductivo)
-            ax4 = fig.add_subplot(2, 2, 4)
+            ax4 = fig.add_subplot(gs[1, 1])
             no_cast = df[df["Mascota_Castrada"] == "No"]
             def _s(c): return float(pd.to_numeric(no_cast[c], errors="coerce").fillna(0).sum()) if c in no_cast.columns else 0.0
             ph, pm = _s("Perros_Hembra"), _s("Perros_Macho")
@@ -1686,11 +1696,13 @@ class Dashboard(tk.Tk):
             vals = [ph, pm, gh, gm]
             cols_b = [RED, ACCENT, RED, ACCENT]
             bars = ax4.bar(cats, vals, color=cols_b, edgecolor=BG_PANEL)
-            ax4.set_title("Animales SIN castrar por sexo\n(las hembras generan camadas)",
-                          fontsize=11, fontweight="bold")
+            ax4.set_title("Animales SIN castrar por sexo (las hembras generan camadas)",
+                          fontsize=11, fontweight="bold", pad=8)
             ax4.set_ylabel("Cantidad")
+            max_v = max(vals) if max(vals) > 0 else 1
+            ax4.set_ylim(0, max_v * 1.18)
             for b, v in zip(bars, vals):
-                ax4.text(b.get_x() + b.get_width() / 2, v + max(vals) * 0.01 + 0.5,
+                ax4.text(b.get_x() + b.get_width() / 2, v + max_v * 0.02,
                          f"{int(v)}", ha="center", fontsize=10,
                          fontweight="bold", color=FG_TEXT)
         self._redraw_fig("Demografía", build)
@@ -1707,7 +1719,7 @@ class Dashboard(tk.Tk):
             # Layout: arriba 2 paneles + abajo 1 panel ancho
             # (eliminado el duplicado de "Demanda ciudadana al municipio"
             #  — ya está en la pestaña Municipio)
-            gs = fig.add_gridspec(2, 2, height_ratios=[1, 1], hspace=0.45, wspace=0.35)
+            gs = fig.add_gridspec(2, 2, height_ratios=[1, 1], hspace=0.30, wspace=0.25)
 
             # 1) ¿La gente que castró por el municipio sabe que es gratis?
             ax1 = fig.add_subplot(gs[0, 0])
@@ -1754,7 +1766,7 @@ class Dashboard(tk.Tk):
                 tmp["_no_mun"] = (~tmp["Municipio_Presente"].astype(str)
                                   .str.contains("Si", case=False, na=False)).astype(int)
                 g = tmp.groupby("Barrio")["_no_mun"].agg(["mean", "size"])
-                g = g[g["size"] >= 3].sort_values("mean", ascending=True).tail(10)
+                g = g[g["size"] >= 3].sort_values("mean", ascending=True).tail(6)
                 if len(g) > 0:
                     pcts = np.asarray(g["mean"].values, dtype=float) * 100
                     ax2.barh(g.index, pcts,
@@ -1854,6 +1866,9 @@ def main():
                              + pd.to_numeric(df["Gatos_Hembra"], errors="coerce").fillna(0))
     if "Total_Mascotas" not in df.columns:
         df["Total_Mascotas"] = df["Total_Perros"] + df["Total_Gatos"]
+    # Marca_Temporal: parsear a datetime para gráficos temporales
+    if "Marca_Temporal" in df.columns:
+        df["Marca_Temporal"] = pd.to_datetime(df["Marca_Temporal"], errors="coerce")
     app = Dashboard(df)
     app.mainloop()
 
