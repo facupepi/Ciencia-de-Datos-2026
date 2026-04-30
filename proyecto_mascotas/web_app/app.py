@@ -214,6 +214,44 @@ def _wrap(s, width=22):
     return "\n".join(textwrap.wrap(str(s), width=width)) or str(s)
 
 
+def _donut(ax, values, labels, colors, title, min_pct_inside=4.0):
+    """Pie/donut con % dentro (solo si la porción es grande) y leyenda lateral.
+
+    Evita el solapamiento de etiquetas externas en porciones chicas.
+    """
+    values = list(values)
+    labels = [str(l) for l in labels]
+    total = sum(values) or 1
+    pcts = [v / total * 100 for v in values]
+
+    def _autopct(p):
+        return f"{p:.0f}%" if p >= min_pct_inside else ""
+
+    wedges, _texts, autotexts = ax.pie(
+        values,
+        labels=None,
+        autopct=_autopct,
+        colors=colors,
+        startangle=90,
+        pctdistance=0.78,
+        wedgeprops={"edgecolor": "white", "linewidth": 2, "width": 0.45},
+        textprops={"fontsize": 11, "fontweight": "bold"},
+    )
+    for at in autotexts:
+        at.set_color("white")
+
+    # Leyenda con % al lado de cada categoría (incluye porciones chicas)
+    legend_labels = [f"{lab} · {p:.0f}%" for lab, p in zip(labels, pcts)]
+    ax.legend(
+        wedges, legend_labels,
+        loc="center left", bbox_to_anchor=(1.02, 0.5),
+        frameon=False, fontsize=9,
+    )
+    ax.set_title(title, pad=10)
+    ax.axis("equal")
+    ax.grid(False)
+
+
 # ── Sidebar ─────────────────────────────────────────────────────────────────
 st.sidebar.markdown(
     f"<h2 style='color:{ACCENT}; margin:0;'>🐾 Dashboard Mascotas</h2>"
@@ -373,19 +411,17 @@ with tabs[0]:
 
     if "Humano_Responsable" in df.columns:
         hr = df["Humano_Responsable"].value_counts()
-        colors = [GREEN if str(x).lower() == "si" else RED for x in hr.index]
-        wedges, texts, autotexts = ax4.pie(
-            hr.values, labels=hr.index.astype(str), autopct="%1.0f%%",
-            colors=colors, pctdistance=0.72, startangle=90,
-            textprops={"fontsize": 11, "fontweight": "bold"},
-            wedgeprops={"edgecolor": "white", "linewidth": 2})
-        for at in autotexts:
-            at.set_color("white")
-        for t in texts:
-            t.set_color(NAVY)
-        ax4.set_title("¿Te considerás humano responsable?")
-        ax4.axis("equal")
-        ax4.grid(False)
+        colors = []
+        for x in hr.index:
+            xl = str(x).lower()
+            if xl == "si":
+                colors.append(GREEN)
+            elif xl == "no":
+                colors.append(RED)
+            else:
+                colors.append(YELLOW)
+        _donut(ax4, hr.values, hr.index.astype(str), colors,
+               "¿Te considerás humano responsable?")
     st.pyplot(fig, clear_figure=True)
 
 
@@ -397,17 +433,8 @@ with tabs[1]:
     if "Mascota_Castrada" in df.columns:
         mc = df["Mascota_Castrada"].value_counts()
         colors = [GREEN if str(x).lower() == "si" else RED for x in mc.index]
-        wedges, texts, autotexts = ax1.pie(
-            mc.values, labels=mc.index.astype(str), autopct="%1.1f%%",
-            colors=colors, startangle=90, pctdistance=0.72,
-            textprops={"fontsize": 11, "fontweight": "bold"},
-            wedgeprops={"edgecolor": "white", "linewidth": 2})
-        for at in autotexts:
-            at.set_color("white")
-        for t in texts:
-            t.set_color(NAVY)
-        ax1.set_title("¿Mascotas castradas?")
-        ax1.grid(False)
+        _donut(ax1, mc.values, mc.index.astype(str), colors,
+               "¿Mascotas castradas?")
 
     cast_en = [c for c in df.columns if c.startswith("CastEn_")]
     if cast_en:
@@ -670,18 +697,8 @@ with tabs[6]:
     if col_id:
         con_id = pd.to_numeric(df[col_id], errors="coerce").fillna(0).mean() * 100
         vals = [con_id, 100 - con_id]
-        wedges, texts, autotexts = ax3.pie(
-            vals, labels=["Con identificador", "Sin identificador"],
-            autopct="%1.0f%%", colors=[GREEN, RED], startangle=90,
-            pctdistance=0.72,
-            textprops={"fontsize": 11, "fontweight": "bold"},
-            wedgeprops={"edgecolor": "white", "linewidth": 2})
-        for at in autotexts:
-            at.set_color("white")
-        for t in texts:
-            t.set_color(NAVY)
-        ax3.set_title("Mascotas con identificación")
-        ax3.grid(False)
+        _donut(ax3, vals, ["Con identificador", "Sin identificador"],
+               [GREEN, RED], "Mascotas con identificación")
 
     if col_solo and col_id and "Ciudad" in df.columns:
         rows = []
@@ -728,17 +745,8 @@ with tabs[7]:
     if "Sabe_Vacunas_Anuales" in df.columns:
         sv = df["Sabe_Vacunas_Anuales"].value_counts()
         colors = [GREEN if str(x).lower() == "si" else RED for x in sv.index]
-        wedges, texts, autotexts = ax2.pie(
-            sv.values, labels=sv.index.astype(str), autopct="%1.0f%%",
-            colors=colors, startangle=90, pctdistance=0.72,
-            textprops={"fontsize": 11, "fontweight": "bold"},
-            wedgeprops={"edgecolor": "white", "linewidth": 2})
-        for at in autotexts:
-            at.set_color("white")
-        for t in texts:
-            t.set_color(NAVY)
-        ax2.set_title("¿Sabe sobre vacunas anuales?")
-        ax2.grid(False)
+        _donut(ax2, sv.values, sv.index.astype(str), colors,
+               "¿Sabe sobre vacunas anuales?")
 
     metricas = []
     if "Humano_Responsable" in df.columns:
