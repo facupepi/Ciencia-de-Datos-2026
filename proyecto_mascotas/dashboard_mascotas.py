@@ -931,8 +931,9 @@ class Dashboard(tk.Tk):
             ax4 = fig.add_subplot(2, 2, 4)
             hr = df["Humano_Responsable"].value_counts()
             ax4.pie(hr.values, autopct="%1.0f%%",
+                    pctdistance=1.15,
                     colors=[GREEN, YELLOW, RED][:len(hr)],
-                    textprops={"color": TEXT_ON_ACCENT, "fontweight": "bold", "fontsize": 10},
+                    textprops={"color": FG_TEXT, "fontweight": "bold", "fontsize": 10},
                     wedgeprops={"edgecolor": BG_PANEL, "linewidth": 2})
             ax4.set_title("¿Te considerás humano responsable?")
             ax4.set_ylabel("")
@@ -951,7 +952,8 @@ class Dashboard(tk.Tk):
             ax1 = fig.add_subplot(1, 3, 1)
             mc = df["Mascota_Castrada"].value_counts()
             ax1.pie(mc.values, autopct="%1.1f%%", colors=[GREEN, RED][:len(mc)],
-                    textprops={"color": TEXT_ON_ACCENT, "fontweight": "bold", "fontsize": 11},
+                    pctdistance=1.15,
+                    textprops={"color": FG_TEXT, "fontweight": "bold", "fontsize": 11},
                     wedgeprops={"edgecolor": BG_PANEL, "linewidth": 2})
             ax1.set_title("Mascotas castradas")
             ax1.set_xlabel(""); ax1.set_ylabel("")
@@ -1233,7 +1235,8 @@ class Dashboard(tk.Tk):
                 vals = [con_id, 100 - con_id]
                 ax3.pie(vals,
                         autopct="%1.0f%%", colors=[GREEN, RED],
-                        textprops={"color": TEXT_ON_ACCENT, "fontweight": "bold", "fontsize": 10},
+                        pctdistance=1.15,
+                        textprops={"color": FG_TEXT, "fontweight": "bold", "fontsize": 10},
                         wedgeprops={"edgecolor": BG_PANEL, "linewidth": 2})
                 ax3.set_title("Mascotas con identificación (chapita o microchip)")
                 ax3.legend(["Con identificador", "Sin identificador"],
@@ -1296,8 +1299,9 @@ class Dashboard(tk.Tk):
             if "Sabe_Vacunas_Anuales" in df.columns:
                 sv = df["Sabe_Vacunas_Anuales"].value_counts()
                 ax3.pie(sv.values, autopct="%1.0f%%",
+                        pctdistance=1.15,
                         colors=[GREEN, RED][:len(sv)],
-                        textprops={"color": TEXT_ON_ACCENT, "fontweight": "bold", "fontsize": 10},
+                        textprops={"color": FG_TEXT, "fontweight": "bold", "fontsize": 10},
                         wedgeprops={"edgecolor": BG_PANEL, "linewidth": 2})
                 ax3.set_title("¿Sabe sobre vacunas anuales?")
                 ax3.legend([f"{lbl} sabe" if lbl == "Si" else f"{lbl} sabe"
@@ -1409,8 +1413,8 @@ class Dashboard(tk.Tk):
             seg_cols = [GREEN, YELLOW, RED]
             wedges, _texts, autotexts = ax2.pie(
                 seg_vals, autopct="%1.0f%%", colors=seg_cols,
-                pctdistance=0.78,
-                textprops={"color": TEXT_ON_ACCENT, "fontweight": "bold", "fontsize": 10},
+                pctdistance=1.12,
+                textprops={"color": FG_TEXT, "fontweight": "bold", "fontsize": 10},
                 wedgeprops={"edgecolor": BG_PANEL, "linewidth": 3, "width": 0.42})
             ax2.text(0, 0, f"{n}\nhogares", ha="center", va="center",
                      fontsize=11, fontweight="bold", color=FG_TEXT)
@@ -1431,14 +1435,14 @@ class Dashboard(tk.Tk):
             ax3.text(0.50, 0.66, f"~{camadas_anio:,}".replace(",", "."),
                      fontsize=56, fontweight="bold", color=ACCENT,
                      transform=ax3.transAxes, va="center", ha="center")
-            ax3.text(0.50, 0.30, "nuevos cachorros / gatitos por ano",
+            ax3.text(0.50, 0.30, "nuevas crías por año",
                      fontsize=11, fontweight="bold", color=FG_TEXT,
                      transform=ax3.transAxes, va="center", ha="center")
             _ax_tooltips[id(ax3)] = (
                 f"Estimado a partir de {int(hembras_riesgo)} hembras sin castrar\n"
-                "x 2 camadas/ano x 4 crias promedio.\n\n"
-                "Cada ano sin campana masiva = mas animales en\n"
-                "situacion de calle, abandono y riesgo sanitario."
+                "x 2 camadas/año x 4 crías promedio.\n\n"
+                "Cada año sin campaña masiva = más animales en\n"
+                "situación de calle, abandono y riesgo sanitario."
             )
 
             # ── 4) Top 10 barrios con más hogares críticos ──
