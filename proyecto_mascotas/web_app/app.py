@@ -472,24 +472,6 @@ if filtros_activos:
         unsafe_allow_html=True,
     )
 
-# Tarjeta: fuente del relevamiento
-st.sidebar.markdown("---")
-st.sidebar.markdown(
-    f"<div style='background:#f0faf8; border-radius:10px; padding:10px 12px; "
-    f"border-left:3px solid {ACCENT}; font-size:12px; color:{NAVY};'>"
-    f"<div style='font-weight:700; font-size:13px; margin-bottom:4px;'>"
-    f"🏥 Clínica Veterinaria Cassina</div>"
-    f"<div>Dra. <b>Daniela Cassina</b> — Médica Veterinaria</div>"
-    f"<div style='margin-top:4px;'>📍 J. L. de Cabrera 1684, San Francisco</div>"
-    f"<div>📞 <a href='tel:035644430344' style='color:{ACCENT};'>03564 43-0344</a></div>"
-    f"<div>📸 <a href='https://instagram.com/clinica_veterinaria_cassina' "
-    f"target='_blank' style='color:{ACCENT};'>@clinica_veterinaria_cassina</a></div>"
-    f"<div style='margin-top:4px; color:#7a8b99; font-size:11px;'>"
-    f"⭐ 4.6 · 3 600+ seguidores · Autora de <i>Entrenando Humanos</i></div>"
-    f"</div>",
-    unsafe_allow_html=True,
-)
-
 # ── Cabecera ────────────────────────────────────────────────────────────────
 n_filtrados = len(df)
 n_total = len(df_full)
@@ -512,8 +494,17 @@ chips = (
 st.markdown(
     f"""
     <div class="hero">
-        <div class="hero-title">🏥 Clínica Veterinaria — Cuidado de Mascotas</div>
-        <div class="hero-sub">
+        <div class="hero-title">🏥 Clínica Veterinaria Cassina</div>
+        <div style="margin-top:6px; font-size:15px; opacity:0.92; font-weight:500;">
+            Dra. <b>Daniela Cassina</b> — Médica Veterinaria
+        </div>
+        <div style="margin-top:6px; font-size:13px; opacity:0.82; display:flex; flex-wrap:wrap; gap:12px;">
+            <span>📍 J. L. de Cabrera 1684, San Francisco</span>
+            <span>📞 <a href="tel:035644430344" style="color:white; text-decoration:underline;">03564 43-0344</a></span>
+            <span>📸 <a href="https://instagram.com/clinica_veterinaria_cassina" target="_blank" style="color:white; text-decoration:underline;">@clinica_veterinaria_cassina</a></span>
+            <span>⭐ 4.6 &nbsp;·&nbsp; 3 600+ seguidores &nbsp;·&nbsp; Autora de <i>Entrenando Humanos</i></span>
+        </div>
+        <div style="margin-top:4px; font-size:12px; opacity:0.7;">
             Dashboard interactivo del relevamiento de cuidado responsable
         </div>
         <div style="margin-top:14px;">{chips}</div>
@@ -534,13 +525,12 @@ if len(df) < 10:
     )
 
 # ── KPIs ────────────────────────────────────────────────────────────────────
-k1, k2, k3, k4, k5, k6 = st.columns(6)
+k1, k2, k3, k4, k5 = st.columns(5)
 k1.metric("📋 Encuestas", f"{len(df):,}".replace(",", "."))
 k2.metric("🐾 Mascotas", f"{int(df['Total_Mascotas'].sum()):,}".replace(",", "."))
 k3.metric("✂️ Castradas", f"{_pct_si(df.get('Mascota_Castrada', pd.Series(dtype=str))):.1f}%")
 k4.metric("💉 Vacunadas", f"{_pct_si(df.get('Vacunadas', pd.Series(dtype=str))):.1f}%")
 k5.metric("🪱 Desparasitadas", f"{_pct_si(df.get('Desparasitadas', pd.Series(dtype=str))):.1f}%")
-k6.metric("🏘️ Barrios", f"{df['Barrio'].nunique() if 'Barrio' in df.columns else 0}")
 
 st.markdown("<br>", unsafe_allow_html=True)
 
