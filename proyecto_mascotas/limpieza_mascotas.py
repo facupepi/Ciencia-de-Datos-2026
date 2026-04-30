@@ -192,8 +192,9 @@ BARRIO_MAP = {
     "La Milka - Sector Procrear": "La Milka",
     "La Milka - Procrear": "La Milka",
     "Milka - Procrear": "La Milka",
-    # Palmares variantes → mantener sub-barrios
-    "Los Palmares": "Palmares",
+    # Palmares variantes (genérico sin número → Palmares I)
+    "Los Palmares": "Palmares I",
+    "Palmares": "Palmares I",
     "Los Palmares Iii": "Palmares III",
     "Palmarés Iii": "Palmares III",
     "Palmares Iii": "Palmares III",
@@ -209,7 +210,8 @@ BARRIO_MAP = {
     "Parque": "Barrio Parque",
     "Nuevo Barrio Parque": "Barrio Parque",
     "30 Viviendas Barrio Parque": "Barrio Parque",
-    "Parque Nortw": "Parque Norte",
+    "Parque Nortw": "Barrio Parque",
+    "Parque Norte": "Barrio Parque",
     # Parque De Las Rosas y Casonas Del Bosque → Las Rosas (mismo barrio)
     "Parque Las Rosas": "Las Rosas",
     "Parque De Las Rosas": "Las Rosas",
@@ -258,7 +260,8 @@ BARRIO_MAP = {
     "Procrear": "La Milka",
     # Plaza San Fco
     "Plaza San Fco": "Plaza San Francisco",
-    # Magdalena variantes → mantener sub-barrios
+    # Magdalena variantes (genérico sin número → Magdalena I)
+    "Magdalena": "Magdalena I",
     "Magdalena 1": "Magdalena I",
     "Magdalena 2": "Magdalena II",
     "Magdalena Dos": "Magdalena II",
@@ -268,6 +271,9 @@ BARRIO_MAP = {
     "Timbues": "Timbúes",
     # Boero Romano → 20 De Junio (mismo barrio)
     "Boero Romano": "20 De Junio",
+    # Savio (todas las variantes son el mismo barrio)
+    "General Savio": "Savio",
+    "Senderos Del Savio": "Savio",
     # Nueva Córdoba
     "Nueva Cordoba": "Nueva Córdoba",
     # Libertador Sur es una calle, no un barrio: corresponde al barrio Bouchard

@@ -1,5 +1,5 @@
 # Informe de Limpieza — Relevamiento Cuidado de Mascotas
-**Fecha de ejecución:** 2026-04-30 17:01:29
+**Fecha de ejecución:** 2026-04-30 17:18:45
 
 ---
 
@@ -82,7 +82,8 @@ Se aplicó `title()` + diccionario de normalización para unificar variantes.
 | La Milka - Sector Procrear | La Milka | 1 |
 | La Milka - Procrear | La Milka | 1 |
 | Milka - Procrear | La Milka | 1 |
-| Los Palmares | Palmares | 4 |
+| Los Palmares | Palmares I | 4 |
+| Palmares | Palmares I | 7 |
 | Los Palmares Iii | Palmares III | 1 |
 | Palmarés Iii | Palmares III | 1 |
 | Palmares Iii | Palmares III | 1 |
@@ -97,7 +98,7 @@ Se aplicó `title()` + diccionario de normalización para unificar variantes.
 | Parque | Barrio Parque | 8 |
 | Nuevo Barrio Parque | Barrio Parque | 1 |
 | 30 Viviendas Barrio Parque | Barrio Parque | 1 |
-| Parque Nortw | Parque Norte | 1 |
+| Parque Nortw | Barrio Parque | 1 |
 | Parque Las Rosas | Las Rosas | 3 |
 | Parque De Las Rosas | Las Rosas | 2 |
 | Casonas Del Bosque | Las Rosas | 3 |
@@ -126,12 +127,14 @@ Se aplicó `title()` + diccionario de normalización para unificar variantes.
 | Loteo Los Manantiales | Manantiales | 1 |
 | Procrear | La Milka | 4 |
 | Plaza San Fco | Plaza San Francisco | 1 |
+| Magdalena | Magdalena I | 3 |
 | Magdalena 1 | Magdalena I | 2 |
 | Magdalena 2 | Magdalena II | 3 |
 | Magdalena Dos | Magdalena II | 1 |
 | Barrio Francucci | Francucci | 1 |
 | Timbues | Timbúes | 1 |
 | Boero Romano | 20 De Junio | 1 |
+| Senderos Del Savio | Savio | 3 |
 | Nueva Cordoba | Nueva Córdoba | 1 |
 | Libertador Sur | Bouchard | 1 |
 | Buchar | Bouchard | 1 |
@@ -140,8 +143,8 @@ Se aplicó `title()` + diccionario de normalización para unificar variantes.
 | Villa Luján Santo Tomé | Villa Luján | 1 |
 | Barrio Ciudad (Las 400) | Las 400 | 1 |
 
-**Total de cambios:** 151
-**Valores únicos tras limpieza:** 72
+**Total de cambios:** 164
+**Valores únicos tras limpieza:** 68
 
 ## 8. Normalización de Ciudad
 - `Plaza San Francisco` (barrio mal cargado como Ciudad) → Ciudad=`San Francisco`, Barrio=`Plaza San Francisco` en **1 fila(s)** (de las cuales 0 tenían Barrio vacío y se completaron).
