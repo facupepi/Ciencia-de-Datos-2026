@@ -701,7 +701,7 @@ with tabs[2]:
             for i, (m, n) in enumerate(zip(g["mean"].values, g["size"].values)):
                 ax2.text(m * 100 + 1.5, i, f"{m*100:.0f}% (n={int(n)})",
                          va="center", fontsize=8, color=NAVY, fontweight="bold")
-    _render_fig(fig, "castracion")
+    _render_fig(fig, "geografia")
 
 
 # ── 4. Barrios prioritarios ─────────────────────────────────────────────────
@@ -749,7 +749,7 @@ with tabs[3]:
             for i, v in enumerate(g2["pct_sin"]):
                 ax2.text(v + 1.5, i, f"{v:.0f}%", va="center",
                          fontsize=8, fontweight="bold", color=NAVY)
-    _render_fig(fig, "castracion")
+    _render_fig(fig, "barrios_prio")
 
 
 # ── 5. Municipio ────────────────────────────────────────────────────────────
@@ -835,7 +835,7 @@ with tabs[4]:
         ax4.set_xticklabels(ct.index)
         ax4.set_title("¿Pide castr. masivas? vs ¿castrada?")
         ax4.legend(title="¿Castrada?", fontsize=8)
-    _render_fig(fig, "castracion")
+    _render_fig(fig, "municipio")
 
 
 # ── 6. Cuidado ──────────────────────────────────────────────────────────────
@@ -881,7 +881,7 @@ with tabs[5]:
             ax2.set_ylim(0, 110)
             ax2.set_ylabel("%")
             ax2.legend(loc="upper right", fontsize=8)
-    _render_fig(fig, "castracion")
+    _render_fig(fig, "cuidado")
 
 
 # ── 7. Callejeros ───────────────────────────────────────────────────────────
@@ -953,7 +953,7 @@ with tabs[6]:
             ax4.set_title("Indicadores de riesgo por ciudad")
             ax4.set_ylabel("%")
             ax4.legend(fontsize=7)
-    _render_fig(fig, "castracion")
+    _render_fig(fig, "callejeros")
 
 
 # ── 8. Brecha informativa ───────────────────────────────────────────────────
@@ -1002,7 +1002,7 @@ with tabs[7]:
         ax3.set_ylim(0, 110)
         ax3.set_ylabel("%")
         _label_bars_v(ax3, vals, fmt="{:.0f}%")
-    _render_fig(fig, "castracion")
+    _render_fig(fig, "brecha")
 
 
 # ── 9. Salud pública ────────────────────────────────────────────────────────
@@ -1053,7 +1053,7 @@ with tabs[8]:
         ax2.set_ylim(0, max(vals + [10]) * 1.30)
         ax2.set_ylabel("%")
         _label_bars_v(ax2, vals, fmt="{:.0f}%")
-    _render_fig(fig, "castracion")
+    _render_fig(fig, "salud")
 
 
 # ── 10. Demografía ──────────────────────────────────────────────────────────
@@ -1139,7 +1139,7 @@ with tabs[9]:
             if v > 0:
                 ax4.text(i, v + max_v * 0.02, f"{int(v)}",
                          ha="center", fontsize=10, fontweight="bold", color=NAVY)
-    _render_fig(fig, "castracion")
+    _render_fig(fig, "demografia")
 
 
 # ── 11. Acción municipal ────────────────────────────────────────────────────
@@ -1197,7 +1197,7 @@ with tabs[10]:
             for i, v in enumerate(pcts):
                 ax3.text(v + 1.5, i, f"{v:.0f}%", va="center",
                          fontsize=9, fontweight="bold", color=NAVY)
-    _render_fig(fig, "castracion")
+    _render_fig(fig, "accion_mun")
 
 
 # ── 12. Tabla ───────────────────────────────────────────────────────────────
