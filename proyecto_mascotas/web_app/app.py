@@ -472,6 +472,24 @@ if filtros_activos:
         unsafe_allow_html=True,
     )
 
+# Tarjeta: fuente del relevamiento
+st.sidebar.markdown("---")
+st.sidebar.markdown(
+    f"<div style='background:#f0faf8; border-radius:10px; padding:10px 12px; "
+    f"border-left:3px solid {ACCENT}; font-size:12px; color:{NAVY};'>"
+    f"<div style='font-weight:700; font-size:13px; margin-bottom:4px;'>"
+    f"🏥 Clínica Veterinaria Cassina</div>"
+    f"<div>Dra. <b>Daniela Cassina</b> — Médica Veterinaria</div>"
+    f"<div style='margin-top:4px;'>📍 J. L. de Cabrera 1684, San Francisco</div>"
+    f"<div>📞 <a href='tel:035644430344' style='color:{ACCENT};'>03564 43-0344</a></div>"
+    f"<div>📸 <a href='https://instagram.com/clinica_veterinaria_cassina' "
+    f"target='_blank' style='color:{ACCENT};'>@clinica_veterinaria_cassina</a></div>"
+    f"<div style='margin-top:4px; color:#7a8b99; font-size:11px;'>"
+    f"⭐ 4.6 · 3 600+ seguidores · Autora de <i>Entrenando Humanos</i></div>"
+    f"</div>",
+    unsafe_allow_html=True,
+)
+
 # ── Cabecera ────────────────────────────────────────────────────────────────
 n_filtrados = len(df)
 n_total = len(df_full)
@@ -754,6 +772,19 @@ with tabs[3]:
                 ax2.text(v + 1.5, i, f"{v:.0f}%", va="center",
                          fontsize=8, fontweight="bold", color=NAVY)
     _render_fig(fig, "barrios_prio")
+    col_e1, col_e2 = st.columns(2)
+    with col_e1:
+        st.caption(
+            "**Barras rojas — volumen absoluto.** Cuántos animales sin castrar se estiman "
+            "por barrio. Indica dónde hay mayor demanda total: ideal para organizar "
+            "castraciones masivas."
+        )
+    with col_e2:
+        st.caption(
+            "**Barras amarillas — penetración del problema.** Qué porcentaje de los hogares "
+            "encuestados en ese barrio no castró. Un barrio pequeño con 100 % sin castrar "
+            "es igual de urgente que uno grande con mucho volumen."
+        )
 
 
 # ── 5. Municipio ────────────────────────────────────────────────────────────
