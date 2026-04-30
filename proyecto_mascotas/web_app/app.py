@@ -438,10 +438,11 @@ if tipos_mascota:
 st.sidebar.markdown(
     f"<div style='background:#ffffff; padding:10px 12px; border-radius:8px; "
     f"margin-top:10px; border-left:3px solid {ACCENT};'>"
-    f"<div style='font-size:11px; color:#7a8b99;'>Registros</div>"
+    f"<div style='font-size:11px; color:#7a8b99;'>Registros filtrados</div>"
     f"<div style='font-size:22px; font-weight:800; color:{ACCENT};'>"
-    f"{len(df):,}</div>".replace(",", ".")
-    + f"<div style='font-size:11px; color:#7a8b99;'>de {len(df_full):,} totales</div></div>".replace(",", "."),
+    f"{len(df):,}".replace(",", ".")
+    + (f"<span style='font-size:12px; color:#7a8b99; font-weight:500;'> / {len(df_full):,}</span>".replace(",", ".") if len(df) != len(df_full) else "")
+    + "</div></div>",
     unsafe_allow_html=True,
 )
 
