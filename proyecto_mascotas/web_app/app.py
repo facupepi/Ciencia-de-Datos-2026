@@ -270,6 +270,106 @@ def _donut(ax, values, labels, colors, title, min_pct_inside=4.0):
     ax.grid(False)
 
 
+def _empty_panel(ax, msg="Sin datos suficientes"):
+    """Limpia un eje y escribe un mensaje centrado de empty-state."""
+    ax.clear()
+    ax.axis("off")
+    ax.text(0.5, 0.5, msg, ha="center", va="center",
+            color="#7a8b99", fontsize=11, style="italic",
+            transform=ax.transAxes)
+
+
+def _section_header(title: str, subtitle: str = ""):
+    """Encabezado consistente arriba de cada tab."""
+    sub_html = (
+        f"<div style='color:#7a8b99; font-size:13px; margin-top:-4px;'>{subtitle}</div>"
+        if subtitle else ""
+    )
+    st.markdown(
+        f"""
+        <div style='margin: 2px 0 14px 0;'>
+            <div style='color:#1f3a5f; font-size:18px; font-weight:700;'>{title}</div>
+            {sub_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _render_fig(fig, key: str):
+    """Muestra una figura matplotlib con botón de descarga PNG."""
+    st.pyplot(fig, clear_figure=False)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
+                facecolor=fig.get_facecolor())
+    buf.seek(0)
+    st.download_button(
+        "⬇️ Descargar como PNG",
+        data=buf.getvalue(),
+        file_name=f"{key}.png",
+        mime="image/png",
+        key=f"dl_{key}",
+        use_container_width=False,
+    )
+    plt.close(fig)
+
+
+def _generar_insights(df: pd.DataFrame) -> list[tuple[str, str, str]]:
+    """Devuelve lista de (icono, titulo, valor/comentario) auto-generados."""
+    out: list[tuple[str, str, str]] = []
+    if "Mascota_Castrada" in df.columns:
+        cast = _pct_si(df["Mascota_Castrada"])
+        if cast >= 70:
+            out.append(("✅", "Castración alta",
+                        f"{cast:.0f}% de los hogares castra. Buen indicador."))
+        elif cast >= 40:
+            out.append(("⚠️", "Castración intermedia",
+                        f"Solo {cast:.0f}% castra: queda margen de mejora."))
+        else:
+            out.append(("🚨", "Castración baja",
+                        f"Apenas {cast:.0f}% castra. Brecha sanitaria importante."))
+
+    if "Vacunadas" in df.columns and "Desparasitadas" in df.columns:
+        ambas = (
+            (df["Vacunadas"].astype(str).str.lower() == "no") &
+            (df["Desparasitadas"].astype(str).str.lower() == "no")
+        ).mean() * 100
+        if ambas > 0:
+            out.append(("🩺", "Riesgo sanitario",
+                        f"{ambas:.0f}% de hogares no vacuna NI desparasita."))
+
+    if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
+        sabe_si = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si"]
+        sabe_no = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "no"]
+        if len(sabe_si) > 5 and len(sabe_no) > 5:
+            p_si = _pct_si(sabe_si.get("Mascota_Castrada", pd.Series(dtype=str)))
+            p_no = _pct_si(sabe_no.get("Mascota_Castrada", pd.Series(dtype=str)))
+            delta = p_si - p_no
+            if abs(delta) >= 10:
+                out.append(("📚", "Información influye",
+                            f"Quien sabe que la castración es gratuita la realiza "
+                            f"{delta:+.0f} pp más."))
+
+    if "Barrio" in df.columns and "Mascota_Castrada" in df.columns and len(df) >= 30:
+        g = (df.assign(_si=df["Mascota_Castrada"].astype(str).str.lower().eq("si"))
+               .groupby("Barrio")["_si"].agg(["mean", "size"])
+               .query("size >= 5")
+               .sort_values("mean"))
+        if not g.empty:
+            peor = g.index[0]
+            out.append(("📍", "Barrio prioritario",
+                        f"«{peor}»: solo {g.iloc[0]['mean']*100:.0f}% castra "
+                        f"(n={int(g.iloc[0]['size'])})."))
+
+    if "Mun_Castraciones_Masivas" in df.columns:
+        pide = pd.to_numeric(df["Mun_Castraciones_Masivas"], errors="coerce").fillna(0).mean() * 100
+        if pide >= 30:
+            out.append(("🏛️", "Demanda al municipio",
+                        f"{pide:.0f}% de hogares pide castraciones masivas."))
+
+    return out[:4]
+
+
 # ── Sidebar ─────────────────────────────────────────────────────────────────
 st.sidebar.markdown(
     f"<h2 style='color:{ACCENT}; margin:0;'>🐾 Dashboard Mascotas</h2>"
@@ -292,6 +392,11 @@ except FileNotFoundError:
 
 st.sidebar.markdown("### 🔍 Filtros")
 
+if st.sidebar.button("🔄 Limpiar filtros", use_container_width=True):
+    for k in ("flt_ciudades", "flt_barrios", "flt_viviendas", "flt_tipos"):
+        st.session_state.pop(k, None)
+    st.rerun()
+
 
 def _opciones(col: str) -> list[str]:
     if col not in df_full.columns:
@@ -302,18 +407,22 @@ def _opciones(col: str) -> list[str]:
 ciudades = st.sidebar.multiselect(
     "Ciudad", _opciones("Ciudad"),
     placeholder="Todas las ciudades",
+    key="flt_ciudades",
 )
 barrios = st.sidebar.multiselect(
     "Barrio", _opciones("Barrio"),
     placeholder="Todos los barrios",
+    key="flt_barrios",
 )
 viviendas = st.sidebar.multiselect(
     "Tipo de vivienda", _opciones("Tipo_Vivienda"),
     placeholder="Todas las viviendas",
+    key="flt_viviendas",
 )
 tipos_mascota = st.sidebar.multiselect(
     "Tipo de mascotas", _opciones("Tipo_Mascotas"),
     placeholder="Todos los tipos",
+    key="flt_tipos",
 )
 
 df = df_full.copy()
@@ -326,7 +435,40 @@ if viviendas:
 if tipos_mascota:
     df = df[df["Tipo_Mascotas"].astype(str).isin(tipos_mascota)]
 
-st.sidebar.markdown(f"**Registros filtrados:** `{len(df):,}`".replace(",", "."))
+st.sidebar.markdown(
+    f"<div style='background:#ffffff; padding:10px 12px; border-radius:8px; "
+    f"margin-top:10px; border-left:3px solid {ACCENT};'>"
+    f"<div style='font-size:11px; color:#7a8b99;'>Registros</div>"
+    f"<div style='font-size:22px; font-weight:800; color:{ACCENT};'>"
+    f"{len(df):,}</div>".replace(",", ".")
+    + f"<div style='font-size:11px; color:#7a8b99;'>de {len(df_full):,} totales</div></div>".replace(",", "."),
+    unsafe_allow_html=True,
+)
+
+# Chips con filtros activos
+filtros_activos: list[str] = []
+if ciudades:
+    filtros_activos.append(f"🏙️ {len(ciudades)} ciudad(es)")
+if barrios:
+    filtros_activos.append(f"🏘️ {len(barrios)} barrio(s)")
+if viviendas:
+    filtros_activos.append(f"🏠 {len(viviendas)} vivienda(s)")
+if tipos_mascota:
+    filtros_activos.append(f"🐾 {len(tipos_mascota)} tipo(s)")
+
+if filtros_activos:
+    chips_html = "".join(
+        f"<span style='display:inline-block; background:{ACCENT}; color:white; "
+        f"padding:3px 9px; border-radius:12px; font-size:11px; "
+        f"margin:2px 3px 2px 0; font-weight:600;'>{c}</span>"
+        for c in filtros_activos
+    )
+    st.sidebar.markdown(
+        f"<div style='margin-top:10px;'>"
+        f"<div style='font-size:11px; color:{NAVY}; font-weight:600; margin-bottom:4px;'>"
+        f"Filtros activos:</div>{chips_html}</div>",
+        unsafe_allow_html=True,
+    )
 
 # ── Cabecera ────────────────────────────────────────────────────────────────
 n_filtrados = len(df)
@@ -415,38 +557,64 @@ def _label_bars_h(ax, vals, fmt="{:.0f}", offset_pct=0.015):
 
 # ── 1. Resumen ──────────────────────────────────────────────────────────────
 with tabs[0]:
+    _section_header(
+        "Vista general",
+        "Composición del relevamiento: tipo de mascotas, viviendas y autopercepción.",
+    )
+
+    insights = _generar_insights(df)
+    if insights:
+        cards = "".join(
+            f"<div style='flex:1; min-width:220px; background:#ffffff; "
+            f"border-left:4px solid {ACCENT}; border-radius:10px; padding:12px 14px; "
+            f"box-shadow:0 2px 6px rgba(31,58,95,0.06);'>"
+            f"<div style='font-size:14px; margin-bottom:4px;'>"
+            f"<span style='font-size:18px;'>{ic}</span> "
+            f"<b style='color:{NAVY};'>{tt}</b></div>"
+            f"<div style='font-size:13px; color:#3a4d5e; line-height:1.4;'>{vv}</div></div>"
+            for ic, tt, vv in insights
+        )
+        st.markdown(
+            f"<div style='display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px;'>"
+            f"{cards}</div>",
+            unsafe_allow_html=True,
+        )
+
     fig, axes = plt.subplots(2, 2, figsize=(13, 8))
     ax1, ax2, ax3, ax4 = axes.flat
 
-    if "Tipo_Mascotas" in df.columns:
+    if "Tipo_Mascotas" in df.columns and not df["Tipo_Mascotas"].dropna().empty:
         c = df["Tipo_Mascotas"].value_counts().sort_values()
         ax1.barh(c.index.astype(str), c.values, color=ACCENT, edgecolor="white")
         ax1.set_title("Tipo de mascotas en el hogar")
-        if len(c):
-            ax1.set_xlim(0, c.max() * 1.2)
-            _label_bars_h(ax1, c.values)
+        ax1.set_xlim(0, _safe_max(c.values) * 1.2)
+        _label_bars_h(ax1, c.values)
+    else:
+        _empty_panel(ax1, "Sin datos de tipo de mascotas")
 
-    if "Tipo_Vivienda" in df.columns:
+    if "Tipo_Vivienda" in df.columns and not df["Tipo_Vivienda"].dropna().empty:
         c = df["Tipo_Vivienda"].value_counts()
         ax2.bar(range(len(c)), c.values, color=BLUE, edgecolor="white")
         ax2.set_xticks(range(len(c)))
         ax2.set_xticklabels([_wrap(x, 12) for x in c.index], fontsize=8)
         ax2.set_title("Tipo de vivienda")
-        if len(c):
-            ax2.set_ylim(0, c.max() * 1.2)
-            _label_bars_v(ax2, c.values, fmt="{:.0f}")
+        ax2.set_ylim(0, _safe_max(c.values) * 1.2)
+        _label_bars_v(ax2, c.values, fmt="{:.0f}")
+    else:
+        _empty_panel(ax2, "Sin datos de vivienda")
 
-    if "Frecuencia_Callejeros" in df.columns:
+    if "Frecuencia_Callejeros" in df.columns and not df["Frecuencia_Callejeros"].dropna().empty:
         c = df["Frecuencia_Callejeros"].value_counts()
         ax3.bar(range(len(c)), c.values, color=YELLOW, edgecolor="white")
         ax3.set_xticks(range(len(c)))
         ax3.set_xticklabels([_wrap(x, 12) for x in c.index], fontsize=8)
         ax3.set_title("Frecuencia de callejeros observados")
-        if len(c):
-            ax3.set_ylim(0, c.max() * 1.2)
-            _label_bars_v(ax3, c.values, fmt="{:.0f}")
+        ax3.set_ylim(0, _safe_max(c.values) * 1.2)
+        _label_bars_v(ax3, c.values, fmt="{:.0f}")
+    else:
+        _empty_panel(ax3, "Sin datos de callejeros")
 
-    if "Humano_Responsable" in df.columns:
+    if "Humano_Responsable" in df.columns and not df["Humano_Responsable"].dropna().empty:
         hr = df["Humano_Responsable"].value_counts()
         colors = []
         for x in hr.index:
@@ -459,11 +627,17 @@ with tabs[0]:
                 colors.append(YELLOW)
         _donut(ax4, hr.values, hr.index.astype(str), colors,
                "¿Te considerás humano responsable?")
-    st.pyplot(fig, clear_figure=True)
+    else:
+        _empty_panel(ax4, "Sin respuestas de autopercepción")
+    _render_fig(fig, "resumen")
 
 
 # ── 2. Castración ───────────────────────────────────────────────────────────
 with tabs[1]:
+    _section_header(
+        "Castración",
+        "Dónde castran y cómo influye conocer que es gratuita.",
+    )
     fig, axes = plt.subplots(1, 3, figsize=(14, 4.5))
     ax1, ax2, ax3 = axes
 
@@ -479,8 +653,8 @@ with tabs[1]:
         labels = [_wrap(c.replace("CastEn_", "").replace("_", " "), 22) for c in sums.index]
         ax2.barh(labels, sums.values, color=ACCENT, edgecolor="white")
         ax2.set_title("¿Dónde castraron?")
-        if sums.max() > 0:
-            ax2.set_xlim(0, sums.max() * 1.2)
+        if _safe_max(sums.values, 0) > 0:
+            ax2.set_xlim(0, _safe_max(sums.values, 1.0) * 1.2)
             _label_bars_h(ax2, sums.values)
 
     if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
@@ -492,11 +666,15 @@ with tabs[1]:
         ax3.set_ylim(0, 110)
         ax3.set_ylabel("% castradas")
         _label_bars_v(ax3, sabe.values, fmt="{:.1f}%")
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 3. Geografía ────────────────────────────────────────────────────────────
 with tabs[2]:
+    _section_header(
+        "Geografía",
+        "Cobertura por barrio y nivel de castración donde hay datos suficientes.",
+    )
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     ax1, ax2 = axes
 
@@ -505,7 +683,7 @@ with tabs[2]:
         ax1.barh(top.index.astype(str), top.values, color=ACCENT, edgecolor="white")
         ax1.set_title("Top 15 barrios por encuestas")
         if len(top):
-            ax1.set_xlim(0, top.max() * 1.18)
+            ax1.set_xlim(0, _safe_max(top.values, 1.0) * 1.18)
             _label_bars_h(ax1, top.values)
 
     if {"Barrio", "Mascota_Castrada"} <= set(df.columns):
@@ -523,11 +701,15 @@ with tabs[2]:
             for i, (m, n) in enumerate(zip(g["mean"].values, g["size"].values)):
                 ax2.text(m * 100 + 1.5, i, f"{m*100:.0f}% (n={int(n)})",
                          va="center", fontsize=8, color=NAVY, fontweight="bold")
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 4. Barrios prioritarios ─────────────────────────────────────────────────
 with tabs[3]:
+    _section_header(
+        "Barrios prioritarios",
+        "Zonas donde concentrar campañas de castración.",
+    )
     no_cast = df[df.get("Mascota_Castrada", pd.Series(dtype=str))
                  .astype(str).str.lower() == "no"].copy()
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
@@ -556,7 +738,7 @@ with tabs[3]:
             ax1.barh(g["Barrio"], g["animales"], color=colors, edgecolor="white")
             ax1.set_title("Top barrios: animales sin castrar (abs.)")
             ax1.set_xlabel("Cantidad estimada de animales sin castrar")
-            ax1.set_xlim(0, g["animales"].max() * 1.18)
+            ax1.set_xlim(0, _safe_max(g["animales"].values, 1.0) * 1.18)
             _label_bars_h(ax1, g["animales"].values)
 
             g2 = g.sort_values("pct_sin", ascending=True)
@@ -567,11 +749,15 @@ with tabs[3]:
             for i, v in enumerate(g2["pct_sin"]):
                 ax2.text(v + 1.5, i, f"{v:.0f}%", va="center",
                          fontsize=8, fontweight="bold", color=NAVY)
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 5. Municipio ────────────────────────────────────────────────────────────
 with tabs[4]:
+    _section_header(
+        "Demanda al municipio",
+        "Pedidos de la comunidad y distribución por ciudad.",
+    )
     mun_cols = [c for c in df.columns if c.startswith("Mun_")]
 
     def _mun_lbl(c, width=24):
@@ -586,7 +772,7 @@ with tabs[4]:
         labels = [_mun_lbl(c, 26) for c in pcts.index]
         ax1.barh(labels, pcts.values, color=BLUE, edgecolor="white")
         ax1.set_title("¿Qué le pide la gente al municipio? (% de hogares)")
-        ax1.set_xlim(0, max(pcts.max() * 1.18, 10))
+        ax1.set_xlim(0, max(_safe_max(pcts.values, 0.0) * 1.18, 10))
         for i, v in enumerate(pcts.values):
             ax1.text(v + 0.5, i, f"{v:.0f}%", va="center",
                      fontsize=8, fontweight="bold", color=NAVY)
@@ -649,11 +835,15 @@ with tabs[4]:
         ax4.set_xticklabels(ct.index)
         ax4.set_title("¿Pide castr. masivas? vs ¿castrada?")
         ax4.legend(title="¿Castrada?", fontsize=8)
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 6. Cuidado ──────────────────────────────────────────────────────────────
 with tabs[5]:
+    _section_header(
+        "Cuidado responsable",
+        "Indicadores combinados y diferencias por tipo de vivienda.",
+    )
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
     ax1, ax2 = axes
     cuidado_cols = ["Mascota_Castrada", "Vacunadas", "Desparasitadas",
@@ -691,11 +881,15 @@ with tabs[5]:
             ax2.set_ylim(0, 110)
             ax2.set_ylabel("%")
             ax2.legend(loc="upper right", fontsize=8)
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 7. Callejeros ───────────────────────────────────────────────────────────
 with tabs[6]:
+    _section_header(
+        "Animales en la calle",
+        "Frecuencia observada, salidas sin supervisión e identificación.",
+    )
     fig, axes = plt.subplots(2, 2, figsize=(14, 9))
     ax1, ax2, ax3, ax4 = axes.flat
 
@@ -759,11 +953,15 @@ with tabs[6]:
             ax4.set_title("Indicadores de riesgo por ciudad")
             ax4.set_ylabel("%")
             ax4.legend(fontsize=7)
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 8. Brecha informativa ───────────────────────────────────────────────────
 with tabs[7]:
+    _section_header(
+        "Brecha informativa",
+        "Distancia entre lo que la gente sabe y lo que efectivamente hace.",
+    )
     fig = plt.figure(figsize=(14, 8.5))
     gs = fig.add_gridspec(2, 2, height_ratios=[1, 1], hspace=0.40, wspace=0.25)
     ax1 = fig.add_subplot(gs[0, 0])
@@ -804,11 +1002,15 @@ with tabs[7]:
         ax3.set_ylim(0, 110)
         ax3.set_ylabel("%")
         _label_bars_v(ax3, vals, fmt="{:.0f}%")
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 9. Salud pública ────────────────────────────────────────────────────────
 with tabs[8]:
+    _section_header(
+        "Salud pública",
+        "Cruces de vacunación y desparasitación: zonas de riesgo zoonótico.",
+    )
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
     ax1, ax2 = axes
     n = len(df)
@@ -851,11 +1053,15 @@ with tabs[8]:
         ax2.set_ylim(0, max(vals + [10]) * 1.30)
         ax2.set_ylabel("%")
         _label_bars_v(ax2, vals, fmt="{:.0f}%")
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 10. Demografía ──────────────────────────────────────────────────────────
 with tabs[9]:
+    _section_header(
+        "Demografía y composición",
+        "Castración por tamaño familiar y densidad de mascotas.",
+    )
     fig, axes = plt.subplots(2, 2, figsize=(14, 9))
     ax1, ax2, ax3, ax4 = axes.flat
 
@@ -888,7 +1094,7 @@ with tabs[9]:
             ax2.set_title("Mascotas por persona, según vivienda")
             ax2.set_xlabel("Mascotas / integrante")
             if g.max() > 0:
-                ax2.set_xlim(0, g.max() * 1.25)
+                ax2.set_xlim(0, _safe_max(g.values, 1.0) * 1.25)
             for i, v in enumerate(g.values):
                 ax2.text(v + g.max() * 0.02, i, f"{v:.2f}",
                          va="center", fontsize=9, fontweight="bold", color=NAVY)
@@ -933,11 +1139,15 @@ with tabs[9]:
             if v > 0:
                 ax4.text(i, v + max_v * 0.02, f"{int(v)}",
                          ha="center", fontsize=10, fontweight="bold", color=NAVY)
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 11. Acción municipal ────────────────────────────────────────────────────
 with tabs[10]:
+    _section_header(
+        "Acción municipal",
+        "Efecto del municipio en la castración y barrios con baja demanda institucional.",
+    )
     fig = plt.figure(figsize=(14, 8.5))
     gs = fig.add_gridspec(2, 2, height_ratios=[1, 1], hspace=0.40, wspace=0.30)
     ax1 = fig.add_subplot(gs[0, 0])
@@ -987,12 +1197,15 @@ with tabs[10]:
             for i, v in enumerate(pcts):
                 ax3.text(v + 1.5, i, f"{v:.0f}%", va="center",
                          fontsize=9, fontweight="bold", color=NAVY)
-    st.pyplot(fig, clear_figure=True)
+    _render_fig(fig, "castracion")
 
 
 # ── 12. Tabla ───────────────────────────────────────────────────────────────
 with tabs[11]:
-    st.subheader("Datos filtrados")
+    _section_header(
+        "Datos filtrados",
+        "Tabla detallada con búsqueda y descarga.",
+    )
     st.caption(f"{len(df):,} filas — podés ordenar y buscar.".replace(",", "."))
     st.dataframe(df, use_container_width=True, height=520)
 
@@ -1086,8 +1299,11 @@ with col_pdf:
         )
 
 st.markdown(
-    f"<div style='text-align:center; color:#7a8b99; font-size:12px; margin-top:30px;'>"
-    f"Dashboard Web · Cuidado de Mascotas · {datetime.now():%Y}"
-    f"</div>",
+    f"<div style='text-align:center; color:#7a8b99; font-size:12px; margin-top:30px; "
+    f"padding:14px; border-top:1px solid #e6eaf0;'>"
+    f"<strong style='color:#1f3a5f;'>Dashboard · Cuidado de Mascotas</strong>"
+    f" &nbsp;·&nbsp; {len(df):,} registros filtrados sobre {len(df_full):,} totales"
+    f" &nbsp;·&nbsp; Última actualización: {datetime.now():%Y-%m-%d %H:%M}"
+    f"</div>".replace(",", "."),
     unsafe_allow_html=True,
 )
