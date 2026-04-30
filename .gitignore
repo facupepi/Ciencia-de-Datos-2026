@@ -90,6 +90,9 @@ celerybeat-schedule
 
 # Environments
 .env
+.env.*
+!.env.example
+tp_scraping/.env
 .venv
 env/
 venv/
