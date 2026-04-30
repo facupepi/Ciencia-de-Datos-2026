@@ -562,6 +562,31 @@ with tabs[0]:
         "Composición del relevamiento: tipo de mascotas, viviendas y autopercepción.",
     )
 
+    # KPI cards: indicadores clave de un vistazo
+    kpi_defs = [
+        ("🐾", "Hogares", f"{len(df):,}".replace(",", "."), NAVY),
+        ("✂️", "Castración", f"{_pct_si(df.get('Mascota_Castrada', pd.Series(dtype=str))):.0f}%", GREEN),
+        ("💉", "Vacunación", f"{_pct_si(df.get('Vacunadas', pd.Series(dtype=str))):.0f}%", BLUE),
+        ("🪱", "Desparasit.", f"{_pct_si(df.get('Desparasitadas', pd.Series(dtype=str))):.0f}%", ACCENT),
+        ("📖", "Sabe gratis", f"{_pct_si(df.get('Sabe_Castracion_Gratuita', pd.Series(dtype=str))):.0f}%", PURPLE),
+    ]
+    kpi_html = "".join(
+        f"<div style='flex:1; min-width:140px; background:#ffffff; "
+        f"border-top:3px solid {col}; border-radius:10px; padding:14px 12px; "
+        f"box-shadow:0 2px 6px rgba(31,58,95,0.06); text-align:center;'>"
+        f"<div style='font-size:22px; line-height:1;'>{ic}</div>"
+        f"<div style='font-size:11px; color:#7a8b99; text-transform:uppercase; "
+        f"letter-spacing:0.5px; margin-top:4px;'>{lbl}</div>"
+        f"<div style='font-size:24px; font-weight:800; color:{col}; margin-top:2px;'>{val}</div>"
+        f"</div>"
+        for ic, lbl, val, col in kpi_defs
+    )
+    st.markdown(
+        f"<div style='display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px;'>"
+        f"{kpi_html}</div>",
+        unsafe_allow_html=True,
+    )
+
     insights = _generar_insights(df)
     if insights:
         cards = "".join(
