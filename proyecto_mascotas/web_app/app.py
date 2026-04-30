@@ -231,9 +231,10 @@ def _safe_max(values, default: float = 1.0) -> float:
 
 
 def _donut(ax, values, labels, colors, title, min_pct_inside=4.0):
-    """Pie/donut con % dentro (solo si la porción es grande) y leyenda lateral.
+    """Pie/donut con % dentro (solo si la porción es grande) y leyenda abajo.
 
-    Evita el solapamiento de etiquetas externas en porciones chicas.
+    Evita el solapamiento de etiquetas externas en porciones chicas y el
+    recorte de leyendas laterales cuando hay varios subplots juntos.
     """
     values = list(values)
     labels = [str(l) for l in labels]
@@ -256,12 +257,13 @@ def _donut(ax, values, labels, colors, title, min_pct_inside=4.0):
     for at in autotexts:
         at.set_color("white")
 
-    # Leyenda con % al lado de cada categoría (incluye porciones chicas)
+    # Leyenda DEBAJO del donut (evita clipping con subplots vecinos)
     legend_labels = [f"{lab} · {p:.0f}%" for lab, p in zip(labels, pcts)]
     ax.legend(
         wedges, legend_labels,
-        loc="center left", bbox_to_anchor=(1.02, 0.5),
+        loc="upper center", bbox_to_anchor=(0.5, -0.02),
         frameon=False, fontsize=9,
+        ncol=min(len(labels), 2),
     )
     ax.set_title(title, pad=10)
     ax.axis("equal")
@@ -361,6 +363,13 @@ st.markdown(
 if df.empty:
     st.warning("No hay registros con los filtros actuales. Probá ajustar el panel lateral.")
     st.stop()
+
+if len(df) < 10:
+    st.info(
+        f"⚠️ Solo hay **{len(df)} encuestas** con los filtros actuales. "
+        "Algunos gráficos pueden quedar vacíos o poco representativos. "
+        "Probá ampliar los filtros para obtener una muestra más significativa."
+    )
 
 # ── KPIs ────────────────────────────────────────────────────────────────────
 k1, k2, k3, k4, k5, k6 = st.columns(6)
@@ -715,11 +724,12 @@ with tabs[6]:
         ax2.barh(gs.index.astype(str), gs.values, color=YELLOW, edgecolor="white")
         ax2.set_title("% que salen solos a la calle\nsegún tipo de vivienda")
         ax2.set_xlabel("%")
-        if gs.max() > 0:
-            ax2.set_xlim(0, max(gs.max() * 1.25, 15))
+        gs_max = _safe_max(gs.values, default=10)
+        ax2.set_xlim(0, max(gs_max * 1.25, 15))
         for i, v in enumerate(gs.values):
-            ax2.text(v + 0.4, i, f"{v:.0f}%", va="center",
-                     fontsize=9, fontweight="bold", color=NAVY)
+            if v > 0:
+                ax2.text(v + 0.4, i, f"{v:.0f}%", va="center",
+                         fontsize=9, fontweight="bold", color=NAVY)
 
     col_id = next((c for c in df.columns if c.startswith("Vive_Tienen")), None)
     if col_id:
