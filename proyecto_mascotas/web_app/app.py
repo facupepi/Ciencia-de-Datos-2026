@@ -73,32 +73,111 @@ plt.rcParams.update({
 st.markdown(
     """
     <style>
-        .block-container { padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1400px; }
-        h1, h2, h3 { color: #1f3a5f; }
-        [data-testid="stMetricValue"] { color: #2a9d8f; font-weight: 700; }
-        [data-testid="stMetric"] {
-            background: #f4faf9; padding: 14px 16px; border-radius: 10px;
-            border-left: 4px solid #2a9d8f;
+        /* Layout */
+        .block-container {
+            padding-top: 1.5rem; padding-bottom: 2rem;
+            max-width: 1400px;
         }
+        /* Tipografía general (NO toca al banner, que usa .hero-*) */
+        .main h1:not(.hero-title),
+        .main h2, .main h3 { color: #1f3a5f; }
+
+        /* Banner principal */
+        .hero {
+            background: linear-gradient(135deg, #2a9d8f 0%, #4895ef 100%);
+            padding: 26px 32px;
+            border-radius: 14px;
+            margin: 4px 0 22px 0;
+            box-shadow: 0 6px 20px rgba(42,157,143,0.25);
+            color: #ffffff !important;
+        }
+        .hero-title {
+            color: #ffffff !important;
+            margin: 0 !important;
+            font-size: 30px !important;
+            font-weight: 800 !important;
+            line-height: 1.15 !important;
+            letter-spacing: -0.5px;
+        }
+        .hero-sub {
+            color: #eaf6f4 !important;
+            margin: 8px 0 0 0 !important;
+            font-size: 14px !important;
+            font-weight: 400 !important;
+        }
+        .hero-sub b { color: #ffffff !important; font-weight: 700 !important; }
+
+        /* Métricas tipo card */
+        [data-testid="stMetric"] {
+            background: linear-gradient(180deg, #ffffff 0%, #f4faf9 100%);
+            padding: 14px 16px;
+            border-radius: 12px;
+            border-left: 4px solid #2a9d8f;
+            box-shadow: 0 2px 6px rgba(31,58,95,0.06);
+        }
+        [data-testid="stMetricValue"] {
+            color: #2a9d8f !important;
+            font-weight: 800 !important;
+            font-size: 1.8rem !important;
+        }
+        [data-testid="stMetricLabel"] {
+            color: #1f3a5f !important;
+            font-weight: 600 !important;
+        }
+
+        /* Sidebar */
         section[data-testid="stSidebar"] {
             background: linear-gradient(180deg, #eaf2f5 0%, #ffffff 100%);
+            border-right: 1px solid #d8e3e8;
         }
-        .stTabs [data-baseweb="tab-list"] { gap: 4px; flex-wrap: wrap; }
+        section[data-testid="stSidebar"] .stMultiSelect label,
+        section[data-testid="stSidebar"] .stFileUploader label {
+            font-weight: 600; color: #1f3a5f;
+        }
+
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 4px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid #e0e8ec;
+        }
         .stTabs [data-baseweb="tab"] {
-            background: #ffffff; border-radius: 8px 8px 0 0;
-            padding: 8px 14px; font-weight: 600;
+            background: #ffffff;
+            border-radius: 10px 10px 0 0;
+            padding: 10px 16px;
+            font-weight: 600;
+            color: #1f3a5f;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+        }
+        .stTabs [data-baseweb="tab"]:hover {
+            background: #f0f7f6;
+            color: #2a9d8f;
         }
         .stTabs [aria-selected="true"] {
-            background: #2a9d8f !important; color: white !important;
+            background: #2a9d8f !important;
+            color: white !important;
+            box-shadow: 0 -2px 8px rgba(42,157,143,0.25);
         }
+        .stTabs [aria-selected="true"] p { color: white !important; }
+
+        /* Botones */
         .stDownloadButton button, .stButton button {
-            background: #2a9d8f; color: white; border: none; border-radius: 8px;
-            font-weight: 600; padding: 8px 16px;
+            background: #2a9d8f; color: white !important;
+            border: none; border-radius: 8px;
+            font-weight: 600; padding: 8px 18px;
+            transition: all 0.15s ease;
         }
         .stDownloadButton button:hover, .stButton button:hover {
-            background: #21867a; color: white;
+            background: #21867a; color: white !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(42,157,143,0.3);
         }
-        hr { border-color: #cfd8dc; }
+
+        /* Otros */
+        hr { border-color: #d8e3e8; }
+        .stDataFrame { border-radius: 10px; overflow: hidden; }
+        .stAlert { border-radius: 10px; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -182,20 +261,34 @@ if tipos_mascota:
 st.sidebar.markdown(f"**Registros filtrados:** `{len(df):,}`".replace(",", "."))
 
 # ── Cabecera ────────────────────────────────────────────────────────────────
+n_filtrados = len(df)
+n_total = len(df_full)
+pct_filtro = (n_filtrados / n_total * 100) if n_total else 100
+n_barrios = df["Barrio"].nunique() if "Barrio" in df.columns else 0
+n_ciudades = df["Ciudad"].nunique() if "Ciudad" in df.columns else 0
+
+chips = (
+    f"<span style='background:rgba(255,255,255,0.18); padding:4px 12px; "
+    f"border-radius:20px; font-size:12px; font-weight:600; margin-right:8px;'>"
+    f"📋 {n_filtrados:,} / {n_total:,} encuestas ({pct_filtro:.0f}%)</span>"
+    f"<span style='background:rgba(255,255,255,0.18); padding:4px 12px; "
+    f"border-radius:20px; font-size:12px; font-weight:600; margin-right:8px;'>"
+    f"🏘️ {n_barrios} barrios</span>"
+    f"<span style='background:rgba(255,255,255,0.18); padding:4px 12px; "
+    f"border-radius:20px; font-size:12px; font-weight:600;'>"
+    f"🏙️ {n_ciudades} ciudades</span>"
+).replace(",", ".")
+
 st.markdown(
     f"""
-    <div style="background: linear-gradient(135deg, {ACCENT} 0%, {BLUE} 100%);
-                padding: 22px 28px; border-radius: 12px; margin-bottom: 20px;
-                box-shadow: 0 4px 12px rgba(42,157,143,0.2);">
-        <h1 style="color:white; margin:0; font-size:28px;">
-            🏥 Clínica Veterinaria — Dashboard de Cuidado de Mascotas
-        </h1>
-        <p style="color:#eaf2f5; margin:6px 0 0 0; font-size:14px;">
-            Análisis interactivo del relevamiento ·
-            <b>{len(df):,}</b> encuestas filtradas (de <b>{len(df_full):,}</b> totales)
-        </p>
+    <div class="hero">
+        <div class="hero-title">🏥 Clínica Veterinaria — Cuidado de Mascotas</div>
+        <div class="hero-sub">
+            Dashboard interactivo del relevamiento de cuidado responsable
+        </div>
+        <div style="margin-top:14px;">{chips}</div>
     </div>
-    """.replace(",", "."),
+    """,
     unsafe_allow_html=True,
 )
 
