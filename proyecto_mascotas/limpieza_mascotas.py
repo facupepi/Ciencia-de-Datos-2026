@@ -32,7 +32,11 @@ def md(line: str = ""):
 def guardar_informe():
     with open(LOG_FILE, "w", encoding="utf-8") as f:
         f.write("\n".join(md_lines))
-    print(f"\n✔ Informe guardado en: {LOG_FILE}")
+    msg = f"\nInforme guardado en: {LOG_FILE}"
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        print(msg.encode("ascii", "replace").decode("ascii"))
 
 
 # ── 1. Carga ────────────────────────────────────────────────────────────────
@@ -99,7 +103,12 @@ for col in df.columns:
     if pd.api.types.is_string_dtype(df[col]):
         original = df[col].copy()
         # Reemplazar narrow no-break space (\u202f), no-break space (\xa0) y zero-width space
-        df[col] = df[col].str.replace(r"[\xa0\u202f\u200b]+", " ", regex=True).str.strip()
+        # Usamos caracteres literales (no \u) por compatibilidad con pyarrow regex.
+        df[col] = (df[col]
+                   .str.replace("\xa0", " ", regex=False)
+                   .str.replace("\u202f", " ", regex=False)
+                   .str.replace("\u200b", "", regex=False)
+                   .str.strip())
         # Contar cambios ignorando NaN
         mask = original.notna() & df[col].notna() & (original != df[col])
         cambios_strip += mask.sum()
@@ -196,14 +205,20 @@ BARRIO_MAP = {
     "Palmares 2": "Palmares II",
     "Palmares 3": "Palmares III",
     "Palmares 4": "Palmares IV",
-    # Parque variantes
-    "Barrio Parque": "Parque",
-    "Nuevo Barrio Parque": "Parque",
-    "30 Viviendas Barrio Parque": "Parque",
+    # Parque → Barrio Parque (nombre oficial)
+    "Parque": "Barrio Parque",
+    "Nuevo Barrio Parque": "Barrio Parque",
+    "30 Viviendas Barrio Parque": "Barrio Parque",
     "Parque Nortw": "Parque Norte",
-    "Parque Las Rosas": "Parque De Las Rosas",
+    # Parque De Las Rosas y Casonas Del Bosque → Las Rosas (mismo barrio)
+    "Parque Las Rosas": "Las Rosas",
+    "Parque De Las Rosas": "Las Rosas",
+    "Casonas Del Bosque": "Las Rosas",
+    "Casonas": "Las Rosas",
     # Villa Golf
     "Villa Golf": "Villa Golf",
+    # Aires Del Golf (typo Ayres → Aires)
+    "Ayres Del Golf": "Aires Del Golf",
     # Roca y variantes
     "Bv. Roca": "Roca",
     "Gral Roca": "Roca",
@@ -213,10 +228,11 @@ BARRIO_MAP = {
     "B° Roca": "Roca",
     # Jardín
     "Jardin": "Jardín",
-    # Maipú
+    # Maipú (Residencial Maipú es el mismo barrio Maipú)
     "Maipu": "Maipú",
     "Nuevo Parque Maipú": "Maipú",
-    "Residencial Maipu": "Residencial Maipú",
+    "Residencial Maipu": "Maipú",
+    "Residencial Maipú": "Maipú",
     # Catedral (limpiar número pegado)
     "Catedral 2134": "Catedral",
     "Cateedral": "Catedral",
@@ -230,8 +246,9 @@ BARRIO_MAP = {
     "San Jose": "San José",
     # Corradi
     "Corradi/ Colonizadores": "Corradi",
-    # Brisas Del Sur
+    # Brisas Del Sur (incluye Emprendimiento Del Sur)
     "Brisa Del Sur": "Brisas Del Sur",
+    "Emprendimiento Del Sur": "Brisas Del Sur",
     # Las 400
     "400 Viviendas": "Las 400",
     # Loteos Manantiales
@@ -249,8 +266,8 @@ BARRIO_MAP = {
     "Barrio Francucci": "Francucci",
     # Timbues → Timbúes (ortografía correcta)
     "Timbues": "Timbúes",
-    # Casonas → Casonas Del Bosque
-    "Casonas": "Casonas Del Bosque",
+    # Boero Romano → 20 De Junio (mismo barrio)
+    "Boero Romano": "20 De Junio",
     # Nueva Córdoba
     "Nueva Cordoba": "Nueva Córdoba",
     # Libertador Sur es una calle, no un barrio: corresponde al barrio Bouchard
@@ -262,6 +279,9 @@ BARRIO_MAP = {
     "9 De Sepriembre": "9 De Septiembre",
     # Barrio Jardín → Jardín (ya pasa por title())
     "Barrio Jardín": "Jardín",
+    # Villa Luján Santo Tomé: Ciudad="Santo Tomé" pegada al Barrio. Se separa.
+    "Villa Luján Santo Tomé": "Villa Luján",
+    "Villa Lujan Santo Tome": "Villa Luján",
     # Barrio Ciudad (Las 400)
     "Barrio Ciudad (Las 400)": "Las 400",
 }
@@ -309,6 +329,49 @@ if n_psf > 0:
 
 ciudades_unicas = sorted(df["Ciudad"].dropna().unique())
 md(f"Valores únicos: `{'`, `'.join(ciudades_unicas)}`")
+
+# 8a. Reasignaciones por Barrio:
+#  - Barrios de Córdoba Capital (Nuevo Centro, Manantiales) → Ciudad = "Córdoba"
+#  - Timbúes (localidad de Santa Fe) → Ciudad = "Otra"
+#  - Barrio "Zona Urbana" (genérico no informativo) → Barrio = "Otro"
+md()
+md("### 8a. Reasignaciones por barrio")
+barrios_cordoba = ["Nuevo Centro", "Manantiales"]
+mask_cba = df["Barrio"].isin(barrios_cordoba)
+n_cba = int(mask_cba.sum())
+if n_cba > 0:
+    df.loc[mask_cba, "Ciudad"] = "Córdoba"
+    md(f"- Barrios `{'`, `'.join(barrios_cordoba)}` → Ciudad = `Córdoba` "
+       f"en **{n_cba} fila(s)** (corresponden a Córdoba Capital, no a San Francisco).")
+
+mask_timb = df["Barrio"].astype(str) == "Timbúes"
+n_timb = int(mask_timb.sum())
+if n_timb > 0:
+    df.loc[mask_timb, "Ciudad"] = "Otra"
+    md(f"- Barrio `Timbúes` (localidad de Santa Fe) → Ciudad = `Otra` "
+       f"en **{n_timb} fila(s)**.")
+
+mask_zu = df["Barrio"].astype(str) == "Zona Urbana"
+n_zu = int(mask_zu.sum())
+if n_zu > 0:
+    df.loc[mask_zu, "Barrio"] = "Otro"
+    md(f"- Barrio `Zona Urbana` (genérico no informativo) → Barrio = `Otro` "
+       f"en **{n_zu} fila(s)**.")
+
+# Recalcular ciudades únicas tras la reasignación
+ciudades_unicas = sorted(df["Ciudad"].dropna().unique())
+md(f"Valores únicos de Ciudad tras reasignación: `{'`, `'.join(ciudades_unicas)}`")
+
+# 8b. Cuando la Ciudad es "Otra", el Barrio reportado no es relevante para
+# el análisis comparativo (ciudad fuera del recorte). Se unifica a "Otro"
+# para evitar que un único registro genere un barrio "fantasma".
+mask_otra = df["Ciudad"].astype(str) == "Otra"
+n_otra = int(mask_otra.sum())
+if n_otra > 0:
+    df.loc[mask_otra, "Barrio"] = "Otro"
+    md()
+    md(f"- Ciudad = `Otra` → se unifica `Barrio = Otro` en **{n_otra} fila(s)** "
+       f"(barrios fuera del recorte geográfico, no comparables).")
 
 # ── 9. Normalización "Tipo_Vivienda" ───────────────────────────────────────
 md()
@@ -581,11 +644,16 @@ guardar_informe()
 
 try:
     df.to_csv(CSV_LIMPIO, index=False, encoding="utf-8")
-    print(f"\n✔ Dataset limpio guardado en: {CSV_LIMPIO}")
+    msg = f"\nDataset limpio guardado en: {CSV_LIMPIO}"
 except PermissionError:
     alt = CSV_LIMPIO.replace(".csv", "_nuevo.csv")
     df.to_csv(alt, index=False, encoding="utf-8")
-    print(f"\n⚠ No se pudo escribir {os.path.basename(CSV_LIMPIO)} (archivo bloqueado).")
-    print(f"  Se guardó como: {os.path.basename(alt)}")
+    msg = (f"\nNo se pudo escribir {os.path.basename(CSV_LIMPIO)} (archivo bloqueado).\n"
+           f"  Se guardo como: {os.path.basename(alt)}")
 
-print("\n🎉 Limpieza completada con éxito.")
+try:
+    print(msg)
+    print("\nLimpieza completada con exito.")
+except UnicodeEncodeError:
+    print(msg.encode("ascii", "replace").decode("ascii"))
+    print("\nLimpieza completada con exito.")

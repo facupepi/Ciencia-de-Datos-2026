@@ -394,7 +394,8 @@ st.sidebar.markdown("### 🔍 Filtros")
 
 if st.sidebar.button("🔄 Limpiar filtros", use_container_width=True):
     for k in ("flt_ciudades", "flt_barrios", "flt_viviendas", "flt_tipos"):
-        st.session_state.pop(k, None)
+        if k in st.session_state:
+            del st.session_state[k]
     st.rerun()
 
 

@@ -1,5 +1,5 @@
 # Informe de Limpieza — Relevamiento Cuidado de Mascotas
-**Fecha de ejecución:** 2026-04-27 09:07:42
+**Fecha de ejecución:** 2026-04-30 17:01:29
 
 ---
 
@@ -94,12 +94,16 @@ Se aplicó `title()` + diccionario de normalización para unificar variantes.
 | Palmares 2 | Palmares II | 3 |
 | Palmares 3 | Palmares III | 5 |
 | Palmares 4 | Palmares IV | 3 |
-| Barrio Parque | Parque | 1 |
-| Nuevo Barrio Parque | Parque | 1 |
-| 30 Viviendas Barrio Parque | Parque | 1 |
+| Parque | Barrio Parque | 8 |
+| Nuevo Barrio Parque | Barrio Parque | 1 |
+| 30 Viviendas Barrio Parque | Barrio Parque | 1 |
 | Parque Nortw | Parque Norte | 1 |
-| Parque Las Rosas | Parque De Las Rosas | 3 |
+| Parque Las Rosas | Las Rosas | 3 |
+| Parque De Las Rosas | Las Rosas | 2 |
+| Casonas Del Bosque | Las Rosas | 3 |
+| Casonas | Las Rosas | 3 |
 | Villa Golf | Villa Golf | 5 |
+| Ayres Del Golf | Aires Del Golf | 2 |
 | Bv. Roca | Roca | 1 |
 | Gral Roca | Roca | 1 |
 | Rocca | Roca | 2 |
@@ -107,7 +111,7 @@ Se aplicó `title()` + diccionario de normalización para unificar variantes.
 | Jardin | Jardín | 2 |
 | Maipu | Maipú | 1 |
 | Nuevo Parque Maipú | Maipú | 1 |
-| Residencial Maipu | Residencial Maipú | 1 |
+| Residencial Maipu | Maipú | 1 |
 | Catedral 2134 | Catedral | 1 |
 | Cateedral | Catedral | 1 |
 | 2 Hermanos | Dos Hermanos | 1 |
@@ -116,6 +120,7 @@ Se aplicó `title()` + diccionario de normalización para unificar variantes.
 | San Jose | San José | 1 |
 | Corradi/ Colonizadores | Corradi | 1 |
 | Brisa Del Sur | Brisas Del Sur | 1 |
+| Emprendimiento Del Sur | Brisas Del Sur | 1 |
 | 400 Viviendas | Las 400 | 1 |
 | Loteo Manantiales | Manantiales | 1 |
 | Loteo Los Manantiales | Manantiales | 1 |
@@ -126,20 +131,29 @@ Se aplicó `title()` + diccionario de normalización para unificar variantes.
 | Magdalena Dos | Magdalena II | 1 |
 | Barrio Francucci | Francucci | 1 |
 | Timbues | Timbúes | 1 |
-| Casonas | Casonas Del Bosque | 3 |
+| Boero Romano | 20 De Junio | 1 |
 | Nueva Cordoba | Nueva Córdoba | 1 |
 | Libertador Sur | Bouchard | 1 |
 | Buchar | Bouchard | 1 |
 | 9 De Sepriembre | 9 De Septiembre | 1 |
 | Barrio Jardín | Jardín | 1 |
+| Villa Luján Santo Tomé | Villa Luján | 1 |
 | Barrio Ciudad (Las 400) | Las 400 | 1 |
 
-**Total de cambios:** 134
-**Valores únicos tras limpieza:** 76
+**Total de cambios:** 151
+**Valores únicos tras limpieza:** 72
 
 ## 8. Normalización de Ciudad
 - `Plaza San Francisco` (barrio mal cargado como Ciudad) → Ciudad=`San Francisco`, Barrio=`Plaza San Francisco` en **1 fila(s)** (de las cuales 0 tenían Barrio vacío y se completaron).
 Valores únicos: `Frontera`, `Josefina`, `Otra`, `San Francisco`
+
+### 8a. Reasignaciones por barrio
+- Barrios `Nuevo Centro`, `Manantiales` → Ciudad = `Córdoba` en **4 fila(s)** (corresponden a Córdoba Capital, no a San Francisco).
+- Barrio `Timbúes` (localidad de Santa Fe) → Ciudad = `Otra` en **1 fila(s)**.
+- Barrio `Zona Urbana` (genérico no informativo) → Barrio = `Otro` en **1 fila(s)**.
+Valores únicos de Ciudad tras reasignación: `Córdoba`, `Frontera`, `Josefina`, `Otra`, `San Francisco`
+
+- Ciudad = `Otra` → se unifica `Barrio = Otro` en **11 fila(s)** (barrios fuera del recorte geográfico, no comparables).
 
 ## 9. Normalización de Tipo de Vivienda
 Valores únicos: `Casa En Alquiler`, `Casa Propia`, `Departamento En Alquiler`, `Departamento Propio`
@@ -285,8 +299,6 @@ Valores que no representan un barrio real — se reemplazan por `NaN`.
 
 | Valor | Filas afectadas |
 |-------|----------------:|
-| `.` | 1 |
-| `-` | 1 |
 | `Ciudad` | 2 |
 | `Josefina` | 1 |
 | `Municipal` | 1 |
@@ -318,7 +330,7 @@ Formato original: `YYYY/MM/DD H:MM:SS p. m. GMT-3`
 
 | Columna | Nulos |
 |---------|------:|
-| `Barrio` | 9 |
+| `Barrio` | 7 |
 | `Integrantes_Familia` | 3 |
 | `Perros_Macho` | 254 |
 | `Perros_Hembra` | 200 |
