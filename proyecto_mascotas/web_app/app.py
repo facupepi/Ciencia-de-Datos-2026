@@ -214,6 +214,22 @@ def _wrap(s, width=22):
     return "\n".join(textwrap.wrap(str(s), width=width)) or str(s)
 
 
+def _safe_max(values, default: float = 1.0) -> float:
+    """Devuelve el máximo de una secuencia ignorando NaN/Inf.
+
+    Si está vacía o el máximo no es finito, devuelve `default`.
+    """
+    try:
+        arr = np.asarray(list(values), dtype=float)
+        arr = arr[np.isfinite(arr)]
+        if arr.size == 0:
+            return float(default)
+        m = float(arr.max())
+        return m if m > 0 else float(default)
+    except Exception:
+        return float(default)
+
+
 def _donut(ax, values, labels, colors, title, min_pct_inside=4.0):
     """Pie/donut con % dentro (solo si la porción es grande) y leyenda lateral.
 
@@ -281,10 +297,22 @@ def _opciones(col: str) -> list[str]:
     return sorted(df_full[col].dropna().astype(str).unique().tolist())
 
 
-ciudades = st.sidebar.multiselect("Ciudad", _opciones("Ciudad"))
-barrios = st.sidebar.multiselect("Barrio", _opciones("Barrio"))
-viviendas = st.sidebar.multiselect("Tipo de vivienda", _opciones("Tipo_Vivienda"))
-tipos_mascota = st.sidebar.multiselect("Tipo de mascotas", _opciones("Tipo_Mascotas"))
+ciudades = st.sidebar.multiselect(
+    "Ciudad", _opciones("Ciudad"),
+    placeholder="Todas las ciudades",
+)
+barrios = st.sidebar.multiselect(
+    "Barrio", _opciones("Barrio"),
+    placeholder="Todos los barrios",
+)
+viviendas = st.sidebar.multiselect(
+    "Tipo de vivienda", _opciones("Tipo_Vivienda"),
+    placeholder="Todas las viviendas",
+)
+tipos_mascota = st.sidebar.multiselect(
+    "Tipo de mascotas", _opciones("Tipo_Mascotas"),
+    placeholder="Todos los tipos",
+)
 
 df = df_full.copy()
 if ciudades:
@@ -859,14 +887,15 @@ with tabs[9]:
         tmp = df.copy()
         tmp["_tot"] = pd.to_numeric(tmp["Total_Mascotas"], errors="coerce").fillna(0)
         muchos = tmp[tmp["_tot"] >= 4]
-        if len(muchos) > 0:
+        if len(muchos) > 0 and not muchos["Barrio"].dropna().empty:
             top = muchos["Barrio"].value_counts().head(8).iloc[::-1]
+            top_max = _safe_max(top.values)
             ax3.barh(top.index.astype(str), top.values, color=YELLOW, edgecolor="white")
             ax3.set_title("Hogares con ≥4 mascotas (acumulación)")
             ax3.set_xlabel("Cantidad de hogares")
-            ax3.set_xlim(0, top.max() * 1.25)
+            ax3.set_xlim(0, top_max * 1.25)
             for i, v in enumerate(top.values):
-                ax3.text(v + top.max() * 0.02, i, f"{int(v)}",
+                ax3.text(v + top_max * 0.02, i, f"{int(v)}",
                          va="center", fontsize=9, fontweight="bold", color=NAVY)
         else:
             ax3.axis("off")
