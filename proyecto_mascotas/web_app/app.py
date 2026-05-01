@@ -724,12 +724,10 @@ with tabs[3]:
     )
     no_cast = df[df.get("Mascota_Castrada", pd.Series(dtype=str))
                  .astype(str).str.lower() == "no"].copy()
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    ax1, ax2 = axes
+    fig, ax = plt.subplots(figsize=(10, 7))
     if no_cast.empty:
         _empty_msg(fig, "No hay hogares sin castrar en el filtro actual")
-        for a in axes:
-            a.axis("off")
+        ax.axis("off")
     else:
         no_cast["_anim"] = pd.to_numeric(no_cast["Total_Mascotas"], errors="coerce").fillna(1)
         g = no_cast.groupby("Barrio").agg(hogares=("_anim", "size"),
@@ -741,40 +739,25 @@ with tabs[3]:
 
         if g.empty:
             _empty_msg(fig, "Sin barrios con ≥3 encuestas")
-            for a in axes:
-                a.axis("off")
+            ax.axis("off")
         else:
             cmap = plt.get_cmap("Reds")
             max_a = max(g["animales"].max(), 1)
             colors = cmap([0.4 + 0.5 * (v / max_a) for v in g["animales"]])
-            ax1.barh(g["Barrio"], g["animales"], color=colors, edgecolor="white")
-            ax1.set_title("Top barrios: animales sin castrar (abs.)")
-            ax1.set_xlabel("Cantidad estimada de animales sin castrar")
-            ax1.set_xlim(0, _safe_max(g["animales"].values, 1.0) * 1.18)
-            _label_bars_h(ax1, g["animales"].values)
-
-            g2 = g.sort_values("pct_sin", ascending=True)
-            ax2.barh(g2["Barrio"], g2["pct_sin"], color=YELLOW, edgecolor="white")
-            ax2.set_title("% hogares sin mascotas castradas\n(mismos barrios)")
-            ax2.set_xlabel("% hogares sin castrar")
-            ax2.set_xlim(0, 110)
-            for i, v in enumerate(g2["pct_sin"]):
-                ax2.text(v + 1.5, i, f"{v:.0f}%", va="center",
-                         fontsize=8, fontweight="bold", color=NAVY)
+            ax.barh(g["Barrio"], g["animales"], color=colors, edgecolor="white")
+            ax.set_title("Top 15 barrios: animales sin castrar", fontsize=13, fontweight="bold")
+            ax.set_xlabel("Cantidad estimada de animales sin castrar")
+            ax.set_xlim(0, _safe_max(g["animales"].values, 1.0) * 1.30)
+            for i, (v, p) in enumerate(zip(g["animales"].values, g["pct_sin"].values)):
+                ax.text(v + _safe_max(g["animales"].values, 1.0) * 0.02, i,
+                        f"{int(v)}  ({p:.0f}%)", va="center",
+                        fontsize=8, fontweight="bold", color=NAVY)
     _render_fig(fig, "barrios_prio")
-    col_e1, col_e2 = st.columns(2)
-    with col_e1:
-        st.caption(
-            "**Barras rojas — volumen absoluto.** Cuántos animales sin castrar se estiman "
-            "por barrio. Indica dónde hay mayor demanda total: ideal para organizar "
-            "castraciones masivas."
-        )
-    with col_e2:
-        st.caption(
-            "**Barras amarillas — penetración del problema.** Qué porcentaje de los hogares "
-            "encuestados en ese barrio no castró. Un barrio pequeño con 100 % sin castrar "
-            "es igual de urgente que uno grande con mucho volumen."
-        )
+    st.caption(
+        "Cada barra muestra la **cantidad estimada de animales sin castrar** en el barrio. "
+        "El número entre paréntesis es el **porcentaje de hogares** de ese barrio sin castrar. "
+        "Solo se incluyen barrios con al menos 3 encuestas."
+    )
 
 
 # ── 5. Municipio ────────────────────────────────────────────────────────────
