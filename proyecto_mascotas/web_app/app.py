@@ -820,7 +820,7 @@ with tabs[5]:
             ax2.set_title("Cuidado por tipo de vivienda (%)")
             ax2.set_ylim(0, 110)
             ax2.set_ylabel("%")
-            ax2.legend(loc="upper right", fontsize=8)
+            ax2.legend(loc="lower right", fontsize=8)
     _render_fig(fig, "cuidado")
 
 
@@ -913,9 +913,8 @@ with tabs[7]:
         "Brecha informativa",
         "Distancia entre lo que la gente sabe y lo que efectivamente hace.",
     )
-    fig, axes = plt.subplots(2, 2, figsize=(14, 9))
-    ax1, ax2 = axes[0]
-    ax3, ax4 = axes[1]
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5))
+    ax1, ax2, ax3 = axes
 
     if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
         # % castración real, separado por si CONOCE o NO la castración gratuita
@@ -985,8 +984,14 @@ with tabs[7]:
         ax3.set_ylim(0, 110)
         ax3.set_ylabel("%")
         _label_bars_v(ax3, vals, fmt="{:.0f}%")
-    ax4.set_visible(False)
+    fig.tight_layout()
     _render_fig(fig, "brecha")
+    st.caption(
+        "**Autopercepción vs práctica real:** compara cuántos hogares se declaran responsables "
+        "con cuántos efectivamente castran, vacunan y desparasitan a sus mascotas. "
+        "Una brecha alta entre 'Se considera responsable' y las demás barras indica que "
+        "la intención no siempre se traduce en acción concreta."
+    )
 
 
 # ── 9. Salud pública ────────────────────────────────────────────────────────
@@ -1151,11 +1156,8 @@ with tabs[10]:
         "Acción municipal",
         "Efecto del municipio en la castración y barrios con baja demanda institucional.",
     )
-    fig = plt.figure(figsize=(14, 8.5))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1], hspace=0.40, wspace=0.30)
-    ax1 = fig.add_subplot(gs[0, 0])
-    ax2 = fig.add_subplot(gs[0, 1])
-    ax3 = fig.add_subplot(gs[1, :])
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5))
+    ax1, ax2, ax3 = axes
 
     if "CastEn_Municipio" in df.columns and "Sabe_Castracion_Gratuita" in df.columns:
         tmp = df.copy()
@@ -1203,6 +1205,7 @@ with tabs[10]:
             for i, v in enumerate(pcts):
                 ax3.text(v + _max * 0.02, i, f"{v:.0f}%", va="center",
                          fontsize=9, fontweight="bold", color=NAVY)
+    fig.tight_layout()
     _render_fig(fig, "accion_mun")
 
 
