@@ -1156,7 +1156,7 @@ with tabs[10]:
         "Acción municipal",
         "Efecto del municipio en la castración y barrios con baja demanda institucional.",
     )
-    fig, axes = plt.subplots(1, 3, figsize=(14, 5))
+    fig, axes = plt.subplots(1, 3, figsize=(17, 5))
     ax1, ax2, ax3 = axes
 
     if "CastEn_Municipio" in df.columns and "Sabe_Castracion_Gratuita" in df.columns:
@@ -1169,7 +1169,7 @@ with tabs[10]:
         g_vals = g.to_numpy(dtype=float)
         ax1.bar(g.index.astype(str), g_vals, color=[GREEN, YELLOW][:len(g)],
                 edgecolor="white")
-        ax1.set_title("% que sabe sobre castración gratuita")
+        ax1.set_title("% que sabe sobre\ncastración gratuita")
         ax1.set_ylabel("%")
         ax1.set_ylim(0, 110)
         _label_bars_v(ax1, g_vals, fmt="{:.0f}%")
@@ -1183,7 +1183,7 @@ with tabs[10]:
         g_vals = g.to_numpy(dtype=float)
         ax2.bar(g.index.astype(str), g_vals, color=[RED, ACCENT][:len(g)],
                 edgecolor="white")
-        ax2.set_title("% SIN castrar, según si pide castr. masivas")
+        ax2.set_title("% SIN castrar, según si\npide castr. masivas")
         ax2.set_ylabel("% sin castrar")
         ax2.set_ylim(0, 110)
         _label_bars_v(ax2, g_vals, fmt="{:.0f}%")
@@ -1198,14 +1198,14 @@ with tabs[10]:
         if not g.empty:
             pcts = g["no_demanda"].to_numpy(dtype=float) * 100
             ax3.barh(g.index.astype(str), pcts, color=RED, edgecolor="white")
-            ax3.set_title("Barrios donde más hogares dicen «no es necesaria la participación del municipio»")
+            ax3.set_title("Barrios donde más hogares dicen\n«no es necesaria la participación del municipio»")
             ax3.set_xlabel("% del barrio")
             _max = float(pcts.max()) if len(pcts) else 10
             ax3.set_xlim(0, _max * 1.25)
             for i, v in enumerate(pcts):
                 ax3.text(v + _max * 0.02, i, f"{v:.0f}%", va="center",
                          fontsize=9, fontweight="bold", color=NAVY)
-    fig.tight_layout()
+    fig.tight_layout(pad=1.5)
     _render_fig(fig, "accion_mun")
 
 
