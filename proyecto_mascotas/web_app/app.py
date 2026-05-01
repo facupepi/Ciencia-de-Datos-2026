@@ -314,61 +314,6 @@ def _render_fig(fig, key: str):
     plt.close(fig)
 
 
-def _generar_insights(df: pd.DataFrame) -> list[tuple[str, str, str]]:
-    """Devuelve lista de (icono, titulo, valor/comentario) auto-generados."""
-    out: list[tuple[str, str, str]] = []
-    if "Mascota_Castrada" in df.columns:
-        cast = _pct_si(df["Mascota_Castrada"])
-        if cast >= 70:
-            out.append(("✅", "Castración alta",
-                        f"{cast:.0f}% de los hogares castra. Buen indicador."))
-        elif cast >= 40:
-            out.append(("⚠️", "Castración intermedia",
-                        f"Solo {cast:.0f}% castra: queda margen de mejora."))
-        else:
-            out.append(("🚨", "Castración baja",
-                        f"Apenas {cast:.0f}% castra. Brecha sanitaria importante."))
-
-    if "Vacunadas" in df.columns and "Desparasitadas" in df.columns:
-        ambas = (
-            (df["Vacunadas"].astype(str).str.lower() == "no") &
-            (df["Desparasitadas"].astype(str).str.lower() == "no")
-        ).mean() * 100
-        if ambas > 0:
-            out.append(("🩺", "Riesgo sanitario",
-                        f"{ambas:.0f}% de hogares no vacuna NI desparasita."))
-
-    if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
-        sabe_si = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si"]
-        sabe_no = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "no"]
-        if len(sabe_si) > 5 and len(sabe_no) > 5:
-            p_si = _pct_si(sabe_si.get("Mascota_Castrada", pd.Series(dtype=str)))
-            p_no = _pct_si(sabe_no.get("Mascota_Castrada", pd.Series(dtype=str)))
-            delta = p_si - p_no
-            if abs(delta) >= 10:
-                out.append(("📚", "Información influye",
-                            f"Quien sabe que la castración es gratuita la realiza "
-                            f"{delta:+.0f} pp más."))
-
-    if "Barrio" in df.columns and "Mascota_Castrada" in df.columns and len(df) >= 30:
-        g = (df.assign(_si=df["Mascota_Castrada"].astype(str).str.lower().eq("si"))
-               .groupby("Barrio")["_si"].agg(["mean", "size"])
-               .query("size >= 5")
-               .sort_values("mean"))
-        if not g.empty:
-            peor = g.index[0]
-            out.append(("📍", "Barrio prioritario",
-                        f"«{peor}»: solo {g.iloc[0]['mean']*100:.0f}% castra "
-                        f"(n={int(g.iloc[0]['size'])})."))
-
-    if "Mun_Castraciones_Masivas" in df.columns:
-        pide = pd.to_numeric(df["Mun_Castraciones_Masivas"], errors="coerce").fillna(0).mean() * 100
-        if pide >= 30:
-            out.append(("🏛️", "Demanda al municipio",
-                        f"{pide:.0f}% de hogares pide castraciones masivas."))
-
-    return out[:4]
-
 
 # ── Sidebar ─────────────────────────────────────────────────────────────────
 st.sidebar.markdown(
@@ -570,24 +515,6 @@ with tabs[0]:
         "Vista general",
         "Composición del relevamiento: tipo de mascotas, viviendas y autopercepción.",
     )
-
-    insights = _generar_insights(df)
-    if insights:
-        cards = "".join(
-            f"<div style='flex:1; min-width:220px; background:#ffffff; "
-            f"border-left:4px solid {ACCENT}; border-radius:10px; padding:12px 14px; "
-            f"box-shadow:0 2px 6px rgba(31,58,95,0.06);'>"
-            f"<div style='font-size:14px; margin-bottom:4px;'>"
-            f"<span style='font-size:18px;'>{ic}</span> "
-            f"<b style='color:{NAVY};'>{tt}</b></div>"
-            f"<div style='font-size:13px; color:#3a4d5e; line-height:1.4;'>{vv}</div></div>"
-            for ic, tt, vv in insights
-        )
-        st.markdown(
-            f"<div style='display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px;'>"
-            f"{cards}</div>",
-            unsafe_allow_html=True,
-        )
 
     fig, axes = plt.subplots(2, 2, figsize=(13, 8))
     ax1, ax2, ax3, ax4 = axes.flat
@@ -880,8 +807,14 @@ with tabs[5]:
             w = 0.27
             colors_b = [YELLOW, GREEN, ACCENT]
             for i, col in enumerate(g.columns):
-                ax2.bar(x + (i - 1) * w, g[col].values, w,
-                        label=col, color=colors_b[i], edgecolor="white")
+                _bars = ax2.bar(x + (i - 1) * w, g[col].values, w,
+                                label=col, color=colors_b[i], edgecolor="white")
+                for bar in _bars:
+                    h = bar.get_height()
+                    if h > 0:
+                        ax2.text(bar.get_x() + bar.get_width() / 2, h + 1,
+                                 f"{h:.0f}%", ha="center", va="bottom",
+                                 fontsize=7, fontweight="bold", color=NAVY)
             ax2.set_xticks(x)
             ax2.set_xticklabels([_wrap(v, 12) for v in g.index], fontsize=8)
             ax2.set_title("Cuidado por tipo de vivienda (%)")
@@ -911,6 +844,10 @@ with tabs[6]:
                 vals_arr = ct[col].to_numpy(dtype=float)
                 ax1.bar(ct.index.astype(str), vals_arr, bottom=bottom,
                         label=col, color=colors_s.get(col, ACCENT), edgecolor="white")
+                for j, (v, b) in enumerate(zip(vals_arr, bottom)):
+                    if v >= 8:
+                        ax1.text(j, b + v / 2, f"{v:.0f}%", ha="center", va="center",
+                                 fontsize=7, fontweight="bold", color="white")
                 bottom = bottom + vals_arr
             ax1.set_title("Frecuencia callejeros por ciudad (%)")
             ax1.set_ylim(0, 100)
@@ -954,8 +891,14 @@ with tabs[6]:
             x = np.arange(len(rd.index))
             w = 0.27
             for i, (col, color) in enumerate(zip(rd.columns, [RED, YELLOW, PURPLE])):
-                ax4.bar(x + (i - 1) * w, rd[col].values, w,
-                        label=col, color=color, edgecolor="white")
+                _bars = ax4.bar(x + (i - 1) * w, rd[col].values, w,
+                                label=col, color=color, edgecolor="white")
+                for bar in _bars:
+                    h = bar.get_height()
+                    if h > 0:
+                        ax4.text(bar.get_x() + bar.get_width() / 2, h + 1,
+                                 f"{h:.0f}%", ha="center", va="bottom",
+                                 fontsize=7, fontweight="bold", color=NAVY)
             ax4.set_xticks(x)
             ax4.set_xticklabels([_wrap(s, 10) for s in rd.index], fontsize=8)
             ax4.set_title("Indicadores de riesgo por ciudad")
@@ -970,11 +913,9 @@ with tabs[7]:
         "Brecha informativa",
         "Distancia entre lo que la gente sabe y lo que efectivamente hace.",
     )
-    fig = plt.figure(figsize=(14, 8.5))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1], hspace=0.40, wspace=0.25)
-    ax1 = fig.add_subplot(gs[0, 0])
-    ax2 = fig.add_subplot(gs[0, 1])
-    ax3 = fig.add_subplot(gs[1, :])
+    fig, axes = plt.subplots(2, 2, figsize=(14, 9))
+    ax1, ax2 = axes[0]
+    ax3, ax4 = axes[1]
 
     if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
         # % castración real, separado por si CONOCE o NO la castración gratuita
@@ -1044,6 +985,7 @@ with tabs[7]:
         ax3.set_ylim(0, 110)
         ax3.set_ylabel("%")
         _label_bars_v(ax3, vals, fmt="{:.0f}%")
+    ax4.set_visible(False)
     _render_fig(fig, "brecha")
 
 
@@ -1256,9 +1198,10 @@ with tabs[10]:
             ax3.barh(g.index.astype(str), pcts, color=RED, edgecolor="white")
             ax3.set_title("Barrios donde más hogares dicen «no es necesaria la participación del municipio»")
             ax3.set_xlabel("% del barrio")
-            ax3.set_xlim(0, 110)
+            _max = float(pcts.max()) if len(pcts) else 10
+            ax3.set_xlim(0, _max * 1.25)
             for i, v in enumerate(pcts):
-                ax3.text(v + 1.5, i, f"{v:.0f}%", va="center",
+                ax3.text(v + _max * 0.02, i, f"{v:.0f}%", va="center",
                          fontsize=9, fontweight="bold", color=NAVY)
     _render_fig(fig, "accion_mun")
 
