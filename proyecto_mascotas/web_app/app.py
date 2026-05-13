@@ -1208,11 +1208,11 @@ with tabs[10]:
     fig.tight_layout(pad=1.5)
     _render_fig(fig, "accion_mun")
     st.caption(
-        "📌 Nota: ambos grupos (quienes castraron por el municipio y quienes no) "
-        "muestran niveles similares de conocimiento sobre la castración gratuita. "
-        "Esto sugiere que el desconocimiento del servicio no es el principal obstáculo — "
-        "la mayoría ya sabe que existe; otros factores como logística, tiempo o prioridad "
-        "pueden explicar mejor la no-castración."
+        "📌 Cómo leer este gráfico: si ambas barras muestran valores similares, "
+        "significa que conocer el servicio de castración gratuita no es lo que diferencia "
+        "a quienes castran de quienes no — el desconocimiento no es la barrera principal. "
+        "En cambio, si las barras difieren notablemente, entonces el acceso a la información "
+        "sí estaría influyendo en la decisión."
     )
 
 
