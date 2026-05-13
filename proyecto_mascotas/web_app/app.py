@@ -1207,6 +1207,13 @@ with tabs[10]:
                          fontsize=9, fontweight="bold", color=NAVY)
     fig.tight_layout(pad=1.5)
     _render_fig(fig, "accion_mun")
+    st.caption(
+        "📌 Nota: ambos grupos (quienes castraron por el municipio y quienes no) "
+        "muestran niveles similares de conocimiento sobre la castración gratuita. "
+        "Esto sugiere que el desconocimiento del servicio no es el principal obstáculo — "
+        "la mayoría ya sabe que existe; otros factores como logística, tiempo o prioridad "
+        "pueden explicar mejor la no-castración."
+    )
 
 
 # ── 12. Tabla ───────────────────────────────────────────────────────────────
