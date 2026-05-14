@@ -1240,66 +1240,706 @@ st.subheader("📄 Reporte PDF resumen")
 st.caption("Genera un PDF con los gráficos clave (filtros aplicados).")
 
 
-def construir_pdf(df: pd.DataFrame) -> bytes:
+# Notas explicativas al pie de cada página del PDF
+PDF_NOTAS = {
+    "resumen":   "% calculado sobre HOGARES encuestados (cada fila = 1 encuesta = 1 hogar). "
+                 "No representa porcentaje de mascotas individuales.",
+    "castracion": "% castradas = hogares que declaran tener su mascota castrada. "
+                  "El gráfico de la derecha compara la tasa de castración según si el hogar sabe o no que el municipio la ofrece gratis.",
+    "geografia": "Solo se muestran barrios con ≥3 encuestas para evitar lecturas espurias por baja muestra. "
+                 "n = cantidad de encuestas del barrio.",
+    "barrios_prio": "Cantidad estimada de animales sin castrar = suma del total de mascotas de hogares no castrados del barrio. "
+                    "Entre paréntesis: % de hogares del barrio sin castrar.",
+    "municipio": "% = hogares que marcaron esa opción. Los pedidos al municipio son multi-respuesta (un hogar puede pedir varias cosas).",
+    "cuidado_acc": "ACCIONES de cuidado: % de hogares que efectivamente CASTRAN, VACUNAN o DESPARASITAN. "
+                   "Estos indicadores se muestran APARTE del conocimiento (ver página siguiente) porque mezclar acción con conocimiento no tiene sentido semántico.",
+    "cuidado_con": "CONOCIMIENTO: % de hogares que SABEN sobre el servicio. Saber no implica actuar — la comparación entre páginas mide la brecha información→acción.",
+    "callejeros": "Frecuencia callejeros = % de hogares de cada ciudad que reportan ver animales 'todo el tiempo / a veces / nunca'. "
+                  "Salen solos e Identificador son indicadores de riesgo del hogar.",
+    "brecha":    "Autopercepción vs práctica: compara cuántos hogares se DECLARAN responsables con cuántos efectivamente castran/vacunan/desparasitan. "
+                 "Una brecha grande indica que la intención no se traduce en acción.",
+    "salud":     "Matriz de riesgo: 4 cuadrantes mutuamente excluyentes (% suman 100). Brecha sanitaria: indicadores SOLAPADOS — 'Ninguna' está dentro de 'No vacuna' y 'No desparasita'.",
+    "demografia": "% castración por tamaño familiar y mascotas/integrante. El último panel cuenta ANIMALES sin castrar por sexo (no hogares).",
+    "accion_mun": "Compara comportamiento (castrar / saber del servicio gratuito) según pedidos al municipio. "
+                  "Si las barras se parecen, la información no es la barrera principal para castrar.",
+}
+
+
+def _filtros_a_texto(ciudades, barrios, viviendas, tipos_mascota) -> str:
+    """Genera string descriptivo de los filtros aplicados para la portada."""
+    partes = []
+    if ciudades:
+        partes.append(f"Ciudades: {', '.join(ciudades)}")
+    if barrios:
+        partes.append(f"Barrios: {len(barrios)} seleccionado(s)")
+    if viviendas:
+        partes.append(f"Viviendas: {', '.join(viviendas)}")
+    if tipos_mascota:
+        partes.append(f"Tipo mascotas: {', '.join(tipos_mascota)}")
+    return " · ".join(partes) if partes else "Sin filtros aplicados (dataset completo)"
+
+
+def _pdf_pie_nota(fig, key: str):
+    """Inserta nota explicativa al pie de la figura."""
+    nota = PDF_NOTAS.get(key)
+    if not nota:
+        return
+    wrapped = textwrap.fill(nota, width=130)
+    fig.text(0.012, 0.012, "Nota: " + wrapped,
+             fontsize=7.5, color=NAVY, style="italic",
+             ha="left", va="bottom")
+
+
+def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
+    """Genera PDF con TODOS los gráficos del dashboard, respetando filtros.
+
+    Estructura: portada → guía de lectura → 11 páginas de gráficos (una por
+    pestaña del dashboard, con Cuidado dividido en 2). Cada página incluye una
+    nota al pie explicando qué representa el %.
+    """
     buf = io.BytesIO()
+    n = len(df)
+
     with PdfPages(buf) as pdf:
-        # Portada
+
+        # ── PORTADA ─────────────────────────────────────────────────
         fig, ax = plt.subplots(figsize=(11, 8.5))
         ax.axis("off")
-        ax.text(0.5, 0.65, "Reporte — Cuidado de Mascotas",
+        ax.text(0.5, 0.72, "Reporte — Cuidado de Mascotas",
                 ha="center", va="center", fontsize=26, fontweight="bold", color=NAVY)
-        ax.text(0.5, 0.55, "Dashboard Web · Streamlit",
+        ax.text(0.5, 0.64, "Clínica Veterinaria Cassina · San Francisco",
                 ha="center", va="center", fontsize=14, color=ACCENT)
-        ax.text(0.5, 0.45, f"{len(df):,} encuestas · {datetime.now():%Y-%m-%d %H:%M}".replace(",", "."),
-                ha="center", va="center", fontsize=11, color=NAVY)
+        ax.text(0.5, 0.55, f"{n:,} encuestas filtradas".replace(",", "."),
+                ha="center", va="center", fontsize=13, color=NAVY, fontweight="bold")
+        ax.text(0.5, 0.50, f"Generado: {datetime.now():%Y-%m-%d %H:%M}",
+                ha="center", va="center", fontsize=10, color="#555555")
+        ax.text(0.5, 0.40,
+                textwrap.fill("Filtros: " + filtros_info, width=80),
+                ha="center", va="center", fontsize=10, color="#555555")
+        ax.text(0.5, 0.12,
+                "Reporte interactivo del relevamiento de cuidado responsable de mascotas.\n"
+                "Cada página corresponde a una pestaña del dashboard web.",
+                ha="center", va="center", fontsize=10, color="#7a8b99", style="italic")
         pdf.savefig(fig); plt.close(fig)
 
-        # KPIs
-        fig, ax = plt.subplots(figsize=(11, 6))
-        ax.set_title("Indicadores clave (% Sí)", fontsize=15, color=NAVY, fontweight="bold")
-        kpis = [
-            ("Castración", _pct_si(df.get("Mascota_Castrada", pd.Series(dtype=str)))),
-            ("Vacunación", _pct_si(df.get("Vacunadas", pd.Series(dtype=str)))),
-            ("Desparasitación", _pct_si(df.get("Desparasitadas", pd.Series(dtype=str)))),
-            ("Sabe vacunas anuales", _pct_si(df.get("Sabe_Vacunas_Anuales", pd.Series(dtype=str)))),
-            ("Sabe castración gratis", _pct_si(df.get("Sabe_Castracion_Gratuita", pd.Series(dtype=str)))),
-            ("Humano responsable", _pct_si(df.get("Humano_Responsable", pd.Series(dtype=str)))),
+        # ── CÓMO LEER ESTE REPORTE (página de guía) ────────────────
+        fig, ax = plt.subplots(figsize=(11, 8.5))
+        ax.axis("off")
+        ax.text(0.06, 0.95, "📖 Cómo leer este reporte",
+                fontsize=20, fontweight="bold", color=NAVY,
+                ha="left", va="top")
+        ax.text(0.06, 0.88,
+                "Antes de interpretar los gráficos, tené en cuenta lo siguiente:",
+                fontsize=11, color=NAVY, ha="left", va="top")
+
+        bloques = [
+            ("⚠️ Unidad de medida",
+             "Cada fila del dataset = 1 HOGAR encuestado, NO 1 mascota. "
+             "Cuando un gráfico dice '% castradas', se refiere al % de hogares que "
+             "declaran tener su mascota castrada. Un hogar puede tener varias mascotas."),
+            ("🧭 Recorrido sugerido",
+             "1) Resumen → composición general\n"
+             "2) Cuidado → indicadores de acciones (castrar/vacunar/desparasitar) "
+             "y conocimiento (separados)\n"
+             "3) Castración + Brecha informativa → ¿saber implica actuar?\n"
+             "4) Geografía + Barrios prioritarios → dónde focalizar\n"
+             "5) Municipio + Acción municipal → demanda institucional\n"
+             "6) Salud pública + Callejeros + Demografía → riesgo zoonótico y composición"),
+            ("🎨 Códigos de color",
+             "Verde = acción / cobertura completa. Amarillo = parcial / advertencia. "
+             "Rojo = falta / riesgo. Azul / Teal = volumen. Violeta = conocimiento."),
+            ("📐 Limitaciones del dato",
+             "• Algunos hogares no informaron cantidad exacta de mascotas por sexo "
+             "(254 nulos en perros macho, 364 en gatos macho de 507 filas) — por eso "
+             "no se puede inferir con certeza el total de animales individuales.\n"
+             "• Barrios con <3 encuestas se filtran en varios gráficos para evitar ruido.\n"
+             "• Las preguntas multi-respuesta (pedidos al municipio, cómo viven) "
+             "permiten que un hogar marque varias opciones — los % NO suman 100."),
+            ("🔧 Corrección importante en 'Cuidado'",
+             "Los indicadores de CONOCIMIENTO (sabe sobre castración gratis / vacunas "
+             "anuales) se muestran en una página APARTE de las ACCIONES (castrar, vacunar, "
+             "desparasitar). Mezclarlos en una misma barra no tiene sentido semántico: "
+             "saber no es actuar, y la diferencia entre ambos es justamente la 'brecha "
+             "informativa' que el municipio debería atacar."),
         ]
-        names = [k[0] for k in kpis][::-1]
-        vals = [k[1] for k in kpis][::-1]
-        ax.barh(names, vals, color=ACCENT, edgecolor="white")
-        ax.set_xlim(0, 115)
-        ax.set_xlabel("% Sí")
-        for i, v in enumerate(vals):
-            ax.text(v + 1, i, f"{v:.1f}%", va="center", fontsize=10,
-                    color=NAVY, fontweight="bold")
+        y = 0.78
+        for titulo, cuerpo in bloques:
+            ax.text(0.06, y, titulo, fontsize=12, fontweight="bold",
+                    color=ACCENT, ha="left", va="top")
+            y -= 0.035
+            for linea in textwrap.wrap(cuerpo, width=110):
+                ax.text(0.08, y, linea, fontsize=9.5, color=NAVY,
+                        ha="left", va="top")
+                y -= 0.022
+            y -= 0.012
         pdf.savefig(fig); plt.close(fig)
 
-        # Top barrios
-        if "Barrio" in df.columns and not df["Barrio"].isna().all():
-            top = df["Barrio"].value_counts().head(15).iloc[::-1]
-            top_vals = top.to_numpy(dtype=float)
-            fig, ax = plt.subplots(figsize=(11, 6))
-            ax.barh(top.index.astype(str), top_vals, color=BLUE, edgecolor="white")
-            ax.set_title("Top 15 barrios por encuestas", fontweight="bold", color=NAVY)
-            for i, v in enumerate(top_vals):
-                ax.text(v + _safe_max(top_vals, 1.0) * 0.01, i, f"{int(v)}",
-                        va="center", fontsize=9, fontweight="bold", color=NAVY)
+        # ───── helpers locales para reusar lógica de las pestañas ────
+        def _add_page(builder, key: str):
+            fig = builder()
+            _pdf_pie_nota(fig, key)
             pdf.savefig(fig); plt.close(fig)
 
-        # Pedidos al municipio
-        cols_mun = [c for c in df.columns if c.startswith("Mun_")]
-        if cols_mun:
-            sums = df[cols_mun].sum().sort_values(ascending=True)
-            sums_vals = sums.to_numpy(dtype=float)
-            labels = [c.replace("Mun_", "").replace("_", " ") for c in sums.index]
-            fig, ax = plt.subplots(figsize=(11, 5))
-            ax.barh(labels, sums_vals, color=ACCENT, edgecolor="white")
-            ax.set_title("Pedidos al municipio", fontweight="bold", color=NAVY)
-            for i, v in enumerate(sums_vals):
-                ax.text(v + _safe_max(sums_vals, 1.0) * 0.01, i, f"{int(v)}",
-                        va="center", fontsize=9, fontweight="bold", color=NAVY)
-            pdf.savefig(fig); plt.close(fig)
+        # ── PÁGINA: RESUMEN ────────────────────────────────────────
+        def _build_resumen():
+            fig, axes = plt.subplots(2, 2, figsize=(11, 8))
+            fig.suptitle("1. Resumen — Vista general", fontsize=14,
+                         fontweight="bold", color=NAVY)
+            ax1, ax2, ax3, ax4 = axes.flat
+            if "Tipo_Mascotas" in df.columns and not df["Tipo_Mascotas"].dropna().empty:
+                c = df["Tipo_Mascotas"].value_counts().sort_values()
+                ax1.barh(c.index.astype(str), c.values, color=ACCENT, edgecolor="white")
+                ax1.set_title("Tipo de mascotas en el hogar")
+                ax1.set_xlim(0, _safe_max(c.values) * 1.2)
+                _label_bars_h(ax1, c.values)
+            else:
+                _empty_panel(ax1, "Sin datos")
+            if "Tipo_Vivienda" in df.columns and not df["Tipo_Vivienda"].dropna().empty:
+                c = df["Tipo_Vivienda"].value_counts()
+                ax2.bar(range(len(c)), c.values, color=BLUE, edgecolor="white")
+                ax2.set_xticks(range(len(c)))
+                ax2.set_xticklabels([_wrap(x, 12) for x in c.index], fontsize=8)
+                ax2.set_title("Tipo de vivienda")
+                ax2.set_ylim(0, _safe_max(c.values) * 1.2)
+                _label_bars_v(ax2, c.values, fmt="{:.0f}")
+            else:
+                _empty_panel(ax2, "Sin datos")
+            if "Frecuencia_Callejeros" in df.columns and not df["Frecuencia_Callejeros"].dropna().empty:
+                c = df["Frecuencia_Callejeros"].value_counts()
+                ax3.bar(range(len(c)), c.values, color=YELLOW, edgecolor="white")
+                ax3.set_xticks(range(len(c)))
+                ax3.set_xticklabels([_wrap(x, 12) for x in c.index], fontsize=8)
+                ax3.set_title("Frecuencia de callejeros observados")
+                ax3.set_ylim(0, _safe_max(c.values) * 1.2)
+                _label_bars_v(ax3, c.values, fmt="{:.0f}")
+            else:
+                _empty_panel(ax3, "Sin datos")
+            if "Humano_Responsable" in df.columns and not df["Humano_Responsable"].dropna().empty:
+                hr = df["Humano_Responsable"].value_counts()
+                colors = [GREEN if str(x).lower() == "si" else RED if str(x).lower() == "no" else YELLOW
+                          for x in hr.index]
+                _donut(ax4, hr.values, hr.index.astype(str), colors,
+                       "¿Te considerás humano responsable?")
+            else:
+                _empty_panel(ax4, "Sin datos")
+            return fig
+        _add_page(_build_resumen, "resumen")
+
+        # ── PÁGINA: CASTRACIÓN ─────────────────────────────────────
+        def _build_castracion():
+            fig, axes = plt.subplots(1, 3, figsize=(13, 5))
+            fig.suptitle("2. Castración", fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2, ax3 = axes
+            if "Mascota_Castrada" in df.columns:
+                mc = df["Mascota_Castrada"].value_counts()
+                colors = [GREEN if str(x).lower() == "si" else RED for x in mc.index]
+                _donut(ax1, mc.values, mc.index.astype(str), colors,
+                       "¿Mascotas castradas?")
+            cast_en = [c for c in df.columns if c.startswith("CastEn_")]
+            if cast_en:
+                sums = df[cast_en].sum().sort_values(ascending=True)
+                labels = [_wrap(c.replace("CastEn_", "").replace("_", " "), 22) for c in sums.index]
+                ax2.barh(labels, sums.values, color=ACCENT, edgecolor="white")
+                ax2.set_title("¿Dónde castraron?")
+                if _safe_max(sums.values, 0) > 0:
+                    ax2.set_xlim(0, _safe_max(sums.values, 1.0) * 1.2)
+                    _label_bars_h(ax2, sums.values)
+            if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
+                sabe = df.groupby("Sabe_Castracion_Gratuita")["Mascota_Castrada"].apply(
+                    lambda s: (s.astype(str).str.lower() == "si").mean() * 100)
+                colors_b = [YELLOW if str(x).lower() == "no" else GREEN for x in sabe.index]
+                ax3.bar(sabe.index.astype(str), sabe.values, color=colors_b, edgecolor="white")
+                ax3.set_title("% castradas según si\nsabe que es gratuita")
+                ax3.set_ylim(0, 110)
+                ax3.set_ylabel("% castradas")
+                _label_bars_v(ax3, sabe.values, fmt="{:.1f}%")
+            return fig
+        _add_page(_build_castracion, "castracion")
+
+        # ── PÁGINA: GEOGRAFÍA ──────────────────────────────────────
+        def _build_geografia():
+            fig, axes = plt.subplots(1, 2, figsize=(13, 6))
+            fig.suptitle("3. Geografía", fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2 = axes
+            if "Barrio" in df.columns:
+                top = df["Barrio"].value_counts().head(15).iloc[::-1]
+                ax1.barh(top.index.astype(str), top.values, color=ACCENT, edgecolor="white")
+                ax1.set_title("Top 15 barrios por encuestas")
+                if len(top):
+                    ax1.set_xlim(0, _safe_max(top.values, 1.0) * 1.18)
+                    _label_bars_h(ax1, top.values)
+            if {"Barrio", "Mascota_Castrada"} <= set(df.columns):
+                g = (df.assign(_si=df["Mascota_Castrada"].astype(str).str.lower().eq("si"))
+                       .groupby("Barrio")["_si"].agg(["mean", "size"])
+                       .query("size >= 3")
+                       .sort_values("mean", ascending=True)
+                       .tail(15))
+                if not g.empty:
+                    mean_arr = g["mean"].to_numpy(dtype=float)
+                    size_arr = g["size"].to_numpy(dtype=float)
+                    ax2.barh(g.index.astype(str), mean_arr * 100,
+                             color=GREEN, edgecolor="white")
+                    ax2.set_title("% castradas por barrio (≥3 encuestas)")
+                    ax2.set_xlabel("%")
+                    ax2.set_xlim(0, 115)
+                    for i, (m, nn) in enumerate(zip(mean_arr, size_arr)):
+                        ax2.text(m * 100 + 1.5, i, f"{m*100:.0f}% (n={int(nn)})",
+                                 va="center", fontsize=8, color=NAVY, fontweight="bold")
+            return fig
+        _add_page(_build_geografia, "geografia")
+
+        # ── PÁGINA: BARRIOS PRIORITARIOS ──────────────────────────
+        def _build_barrios_prio():
+            no_cast = df[df.get("Mascota_Castrada", pd.Series(dtype=str))
+                         .astype(str).str.lower() == "no"].copy()
+            fig, ax = plt.subplots(figsize=(11, 7))
+            fig.suptitle("4. Barrios prioritarios", fontsize=14, fontweight="bold", color=NAVY)
+            if no_cast.empty:
+                _empty_msg(fig, "No hay hogares sin castrar en el filtro actual")
+                ax.axis("off")
+                return fig
+            no_cast["_anim"] = pd.to_numeric(no_cast["Total_Mascotas"], errors="coerce").fillna(1)
+            g = no_cast.groupby("Barrio").agg(hogares=("_anim", "size"),
+                                              animales=("_anim", "sum")).reset_index()
+            tot_hog = df.groupby("Barrio").size().rename("total_hog")
+            g = g.merge(tot_hog, on="Barrio", how="left")
+            g["pct_sin"] = g["hogares"] / g["total_hog"] * 100
+            g = g[g["total_hog"] >= 3].sort_values("animales", ascending=True).tail(15)
+            if g.empty:
+                _empty_msg(fig, "Sin barrios con ≥3 encuestas")
+                ax.axis("off")
+                return fig
+            cmap = plt.get_cmap("Reds")
+            max_a = max(g["animales"].max(), 1)
+            colors = cmap([0.4 + 0.5 * (v / max_a) for v in g["animales"]])
+            ax.barh(g["Barrio"], g["animales"], color=colors, edgecolor="white")
+            ax.set_title("Top 15 barrios: animales sin castrar")
+            ax.set_xlabel("Cantidad estimada de animales sin castrar")
+            ax.set_xlim(0, _safe_max(g["animales"].values, 1.0) * 1.30)
+            for i, (v, p) in enumerate(zip(g["animales"].values, g["pct_sin"].values)):
+                ax.text(v + _safe_max(g["animales"].values, 1.0) * 0.02, i,
+                        f"{int(v)}  ({p:.0f}%)", va="center",
+                        fontsize=8, fontweight="bold", color=NAVY)
+            return fig
+        _add_page(_build_barrios_prio, "barrios_prio")
+
+        # ── PÁGINA: MUNICIPIO ──────────────────────────────────────
+        def _build_municipio():
+            mun_cols = [c for c in df.columns if c.startswith("Mun_")]
+            def _mun_lbl(c, width=24):
+                return _wrap(c.replace("Mun_", "").replace("_", " "), width)
+            fig, axes = plt.subplots(2, 2, figsize=(13, 9))
+            fig.suptitle("5. Demanda al municipio", fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2, ax3, ax4 = axes.flat
+            if mun_cols:
+                pcts = (df[mun_cols].sum() / max(len(df), 1) * 100).sort_values(ascending=True)
+                labels = [_mun_lbl(c, 26) for c in pcts.index]
+                ax1.barh(labels, pcts.values, color=BLUE, edgecolor="white")
+                ax1.set_title("¿Qué le pide la gente al municipio? (% de hogares)")
+                ax1.set_xlim(0, max(_safe_max(pcts.values, 0.0) * 1.18, 10))
+                for i, v in enumerate(pcts.values):
+                    ax1.text(v + 0.5, i, f"{v:.0f}%", va="center",
+                             fontsize=8, fontweight="bold", color=NAVY)
+            top4 = sorted(mun_cols, key=lambda c: -df[c].sum())[:4] if mun_cols else []
+            if top4 and "Mascota_Castrada" in df.columns:
+                rows = []
+                for c in top4:
+                    sub = df[df[c] == 1]
+                    if len(sub) > 0:
+                        rows.append((_mun_lbl(c, 22),
+                                     (sub["Mascota_Castrada"].astype(str).str.lower() == "si").mean() * 100))
+                if rows:
+                    labels = [r[0] for r in rows]
+                    vals = [r[1] for r in rows]
+                    ax2.barh(labels, vals, color=ACCENT, edgecolor="white")
+                    ax2.set_title("% castración entre quienes\npiden cada mejora")
+                    ax2.set_xlim(0, 110)
+                    for i, v in enumerate(vals):
+                        ax2.text(v + 1.5, i, f"{v:.0f}%", va="center",
+                                 fontsize=9, fontweight="bold", color=NAVY)
+            if mun_cols and "Ciudad" in df.columns:
+                top5 = sorted(mun_cols, key=lambda c: -df[c].sum())[:5]
+                pivot = df.groupby("Ciudad")[top5].mean() * 100
+                pivot.columns = [_mun_lbl(c, 14) for c in pivot.columns]
+                if not pivot.empty:
+                    ax3.imshow(pivot.values, aspect="auto", cmap="YlOrRd", vmin=0, vmax=100)
+                    ax3.set_xticks(range(len(pivot.columns)))
+                    ax3.set_xticklabels(pivot.columns, fontsize=7)
+                    ax3.set_yticks(range(len(pivot.index)))
+                    ax3.set_yticklabels(pivot.index, fontsize=8)
+                    ax3.set_title("% que lo pide, por ciudad")
+                    ax3.grid(False)
+                    for i in range(pivot.shape[0]):
+                        for j in range(pivot.shape[1]):
+                            v = pivot.values[i, j]
+                            col = "white" if v > 50 else NAVY
+                            ax3.text(j, i, f"{v:.0f}", ha="center", va="center",
+                                     color=col, fontsize=8, fontweight="bold")
+            col_cm = "Mun_Castraciones_Masivas"
+            if col_cm in df.columns and "Mascota_Castrada" in df.columns:
+                ct = pd.crosstab(df[col_cm].map({0: "No pide", 1: "Sí pide"}),
+                                 df["Mascota_Castrada"])
+                x = np.arange(len(ct.index))
+                w = 0.38
+                for i, (col, color) in enumerate(zip(ct.columns, [RED, GREEN])):
+                    ax4.bar(x + (i - 0.5) * w, ct[col].values, w,
+                            label=str(col), color=color, edgecolor="white")
+                ax4.set_xticks(x)
+                ax4.set_xticklabels(ct.index)
+                ax4.set_title("¿Pide castr. masivas? vs ¿castrada?")
+                ax4.legend(title="¿Castrada?", fontsize=8)
+            return fig
+        _add_page(_build_municipio, "municipio")
+
+        # ── PÁGINAS: CUIDADO (split acciones vs conocimiento) ──────
+        def _build_cuidado_acciones():
+            fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
+            fig.suptitle("6a. Cuidado — ACCIONES",
+                         fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2 = axes
+            # Solo acciones reales
+            acc_cols = ["Mascota_Castrada", "Vacunadas", "Desparasitadas"]
+            nombres = ["Castradas", "Vacunadas", "Desparasit."]
+            pares = [(n, _pct_si(df[c])) for n, c in zip(nombres, acc_cols) if c in df.columns]
+            if pares:
+                labels = [p[0] for p in pares]
+                vals = [p[1] for p in pares]
+                colors = [YELLOW, GREEN, ACCENT][:len(pares)]
+                ax1.bar(labels, vals, color=colors, edgecolor="white")
+                ax1.set_title("% de hogares que ACTÚAN")
+                ax1.set_ylim(0, 110)
+                _label_bars_v(ax1, vals, fmt="{:.1f}%")
+            if "Tipo_Vivienda" in df.columns:
+                sub = df.copy()
+                cols_b = []
+                for c in acc_cols:
+                    if c in sub.columns:
+                        sub[c + "_b"] = (sub[c].astype(str).str.lower() == "si").astype(int)
+                        cols_b.append(c + "_b")
+                if cols_b:
+                    g = sub.groupby("Tipo_Vivienda")[cols_b].mean() * 100
+                    g.columns = nombres[:len(cols_b)]
+                    x = np.arange(len(g.index))
+                    w = 0.27
+                    colors_b = [YELLOW, GREEN, ACCENT]
+                    for i, col in enumerate(g.columns):
+                        ax2.bar(x + (i - 1) * w, g[col].values, w,
+                                label=col, color=colors_b[i], edgecolor="white")
+                    ax2.set_xticks(x)
+                    ax2.set_xticklabels([_wrap(v, 12) for v in g.index], fontsize=8)
+                    ax2.set_title("Acciones por tipo de vivienda (%)")
+                    ax2.set_ylim(0, 110)
+                    ax2.legend(loc="lower right", fontsize=8)
+            return fig
+        _add_page(_build_cuidado_acciones, "cuidado_acc")
+
+        def _build_cuidado_conocimiento():
+            fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
+            fig.suptitle("6b. Cuidado — CONOCIMIENTO de servicios",
+                         fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2 = axes
+            con_cols = ["Sabe_Castracion_Gratuita", "Sabe_Vacunas_Anuales"]
+            nombres = ["Sabe Cast.\nGratis", "Sabe Vac.\nAnuales"]
+            pares = [(n, _pct_si(df[c])) for n, c in zip(nombres, con_cols) if c in df.columns]
+            if pares:
+                labels = [p[0] for p in pares]
+                vals = [p[1] for p in pares]
+                ax1.bar(labels, vals, color=PURPLE, edgecolor="white")
+                ax1.set_title("% de hogares que SABE")
+                ax1.set_ylim(0, 110)
+                _label_bars_v(ax1, vals, fmt="{:.1f}%")
+            # ¿Saber se traduce en castrar? — comparación
+            if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
+                sabe_si = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si"]
+                sabe_no = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "no"]
+                p_si = _pct_si(sabe_si.get("Mascota_Castrada", pd.Series(dtype=str)))
+                p_no = _pct_si(sabe_no.get("Mascota_Castrada", pd.Series(dtype=str)))
+                labels = [f"Sabe (n={len(sabe_si)})", f"No sabe (n={len(sabe_no)})"]
+                vals = [p_si, p_no]
+                ax2.bar(labels, vals, color=[GREEN, RED], edgecolor="white")
+                ax2.set_title("¿Conocer el servicio se traduce\nen castrar?")
+                ax2.set_ylim(0, 110)
+                ax2.set_ylabel("% castradas")
+                _label_bars_v(ax2, vals, fmt="{:.0f}%")
+            return fig
+        _add_page(_build_cuidado_conocimiento, "cuidado_con")
+
+        # ── PÁGINA: CALLEJEROS ─────────────────────────────────────
+        def _build_callejeros():
+            fig, axes = plt.subplots(2, 2, figsize=(13, 9))
+            fig.suptitle("7. Animales en la calle", fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2, ax3, ax4 = axes.flat
+            if {"Frecuencia_Callejeros", "Ciudad"} <= set(df.columns):
+                ct = pd.crosstab(df["Ciudad"], df["Frecuencia_Callejeros"], normalize="index") * 100
+                order = [c for c in ["Todo El Tiempo", "A Veces", "Nunca"] if c in ct.columns]
+                if order:
+                    ct = ct[order]
+                    bottom = np.zeros(len(ct))
+                    colors_s = {"Todo El Tiempo": RED, "A Veces": YELLOW, "Nunca": GREEN}
+                    for col in ct.columns:
+                        vals_arr = ct[col].to_numpy(dtype=float)
+                        ax1.bar(ct.index.astype(str), vals_arr, bottom=bottom,
+                                label=col, color=colors_s.get(col, ACCENT), edgecolor="white")
+                        bottom = bottom + vals_arr
+                    ax1.set_title("Frecuencia callejeros por ciudad (%)")
+                    ax1.set_ylim(0, 100)
+                    ax1.legend(fontsize=7, loc="lower right")
+            col_solo = next((c for c in df.columns if c.startswith("Vive_Salen_solos")), None)
+            if col_solo and "Tipo_Vivienda" in df.columns:
+                gs = (df.groupby("Tipo_Vivienda")[col_solo]
+                        .apply(lambda s: pd.to_numeric(s, errors="coerce").fillna(0).mean() * 100)
+                        .sort_values(ascending=True))
+                ax2.barh(gs.index.astype(str), gs.values, color=YELLOW, edgecolor="white")
+                ax2.set_title("% que salen solos según vivienda")
+                gs_max = _safe_max(gs.values, default=10)
+                ax2.set_xlim(0, max(gs_max * 1.25, 15))
+                for i, v in enumerate(gs.values):
+                    if v > 0:
+                        ax2.text(v + 0.4, i, f"{v:.0f}%", va="center",
+                                 fontsize=9, fontweight="bold", color=NAVY)
+            col_id = next((c for c in df.columns if c.startswith("Vive_Tienen")), None)
+            if col_id:
+                con_id = pd.to_numeric(df[col_id], errors="coerce").fillna(0).mean() * 100
+                vals = [con_id, 100 - con_id]
+                _donut(ax3, vals, ["Con identificador", "Sin identificador"],
+                       [GREEN, RED], "Mascotas con identificación")
+            if col_solo and col_id and "Ciudad" in df.columns:
+                rows = []
+                for ciudad, sub in df.groupby("Ciudad"):
+                    cal_alto = (sub.get("Frecuencia_Callejeros", pd.Series(dtype=str))
+                                  .astype(str).eq("Todo El Tiempo")).mean() * 100
+                    sol = pd.to_numeric(sub[col_solo], errors="coerce").fillna(0).mean() * 100
+                    sin_id = (1 - pd.to_numeric(sub[col_id], errors="coerce").fillna(0).mean()) * 100
+                    rows.append((str(ciudad), cal_alto, sol, sin_id))
+                if rows:
+                    rd = pd.DataFrame(rows, columns=["Ciudad", "Callej. alto",
+                                                     "Salen solos", "Sin ID"]).set_index("Ciudad")
+                    x = np.arange(len(rd.index))
+                    w = 0.27
+                    for i, (col, color) in enumerate(zip(rd.columns, [RED, YELLOW, PURPLE])):
+                        ax4.bar(x + (i - 1) * w, rd[col].values, w,
+                                label=col, color=color, edgecolor="white")
+                    ax4.set_xticks(x)
+                    ax4.set_xticklabels([_wrap(s, 10) for s in rd.index], fontsize=8)
+                    ax4.set_title("Indicadores de riesgo por ciudad")
+                    ax4.legend(fontsize=7)
+            return fig
+        _add_page(_build_callejeros, "callejeros")
+
+        # ── PÁGINA: BRECHA INFORMATIVA ─────────────────────────────
+        def _build_brecha():
+            fig, axes = plt.subplots(1, 3, figsize=(14, 5))
+            fig.suptitle("8. Brecha informativa", fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2, ax3 = axes
+            if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
+                sabe_si_df = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si"]
+                sabe_no_df = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "no"]
+                p_si = _pct_si(sabe_si_df.get("Mascota_Castrada", pd.Series(dtype=str)))
+                p_no = _pct_si(sabe_no_df.get("Mascota_Castrada", pd.Series(dtype=str)))
+                n_si, n_no = len(sabe_si_df), len(sabe_no_df)
+                if n_si + n_no > 0:
+                    labels = [f"Sabe (n={n_si})", f"No sabe (n={n_no})"]
+                    vals = [p_si, p_no]
+                    ax1.bar(labels, vals, color=[GREEN, RED], edgecolor="white", width=0.55)
+                    ax1.set_title("¿Conocer la castración gratuita\ncambia la decisión?")
+                    ax1.set_ylabel("% que castró")
+                    ax1.set_ylim(0, 110)
+                    _label_bars_v(ax1, vals, fmt="{:.0f}%")
+                    delta = p_si - p_no
+                    ax1.text(0.5, 0.95, f"Brecha: {delta:+.0f} pp",
+                             ha="center", va="top", fontsize=10,
+                             fontweight="bold", color=NAVY,
+                             transform=ax1.transAxes,
+                             bbox=dict(boxstyle="round,pad=0.3",
+                                       facecolor="#fff3b0",
+                                       edgecolor=NAVY, linewidth=1))
+            if "Sabe_Vacunas_Anuales" in df.columns:
+                sv = df["Sabe_Vacunas_Anuales"].value_counts()
+                colors = [GREEN if str(x).lower() == "si" else RED for x in sv.index]
+                _donut(ax2, sv.values, sv.index.astype(str), colors,
+                       "¿Sabe sobre vacunas anuales?")
+            metricas = []
+            if "Humano_Responsable" in df.columns:
+                metricas.append(("Se cree\nresponsable", _pct_si(df["Humano_Responsable"])))
+            if "Mascota_Castrada" in df.columns:
+                metricas.append(("Castra realm.", _pct_si(df["Mascota_Castrada"])))
+            if "Vacunadas" in df.columns:
+                metricas.append(("Vacuna realm.", _pct_si(df["Vacunadas"])))
+            if "Desparasitadas" in df.columns:
+                metricas.append(("Despar. realm.", _pct_si(df["Desparasitadas"])))
+            if metricas:
+                labels = [m[0] for m in metricas]
+                vals = [m[1] for m in metricas]
+                colors = [PURPLE, YELLOW, GREEN, ACCENT][:len(metricas)]
+                ax3.bar(labels, vals, color=colors, edgecolor="white")
+                ax3.set_title("Autopercepción vs práctica real")
+                ax3.set_ylim(0, 110)
+                _label_bars_v(ax3, vals, fmt="{:.0f}%")
+            return fig
+        _add_page(_build_brecha, "brecha")
+
+        # ── PÁGINA: SALUD PÚBLICA ──────────────────────────────────
+        def _build_salud():
+            fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
+            fig.suptitle("9. Salud pública", fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2 = axes
+            if {"Vacunadas", "Desparasitadas"} <= set(df.columns) and n > 0:
+                ct = pd.crosstab(df["Vacunadas"], df["Desparasitadas"])
+                ct = ct.reindex(index=["Si", "No"], columns=["Si", "No"], fill_value=0)
+                cat = np.array([[0, 1], [1, 2]])
+                cmap = ListedColormap([GREEN, YELLOW, RED])
+                ax1.imshow(cat, cmap=cmap, aspect="auto", vmin=0, vmax=2)
+                ax1.set_xticks([0, 1])
+                ax1.set_xticklabels(["Desparasita ✓", "No desparasita ✗"], fontsize=10)
+                ax1.set_yticks([0, 1])
+                ax1.set_yticklabels(["Vacuna ✓", "No vacuna ✗"], fontsize=10)
+                ax1.set_title("Matriz de riesgo sanitario")
+                ax1.grid(False)
+                celdas_txt = [["Cobertura\ncompleta", "Solo\nvacunan"],
+                              ["Solo\ndesparasitan", "Doble\nriesgo"]]
+                for i in range(2):
+                    for j in range(2):
+                        v = int(ct.values[i, j])
+                        pct = v / n * 100 if n else 0
+                        ax1.text(j, i - 0.18, celdas_txt[i][j], ha="center", va="center",
+                                 fontsize=10, fontweight="bold", color="white")
+                        ax1.text(j, i + 0.18, f"{pct:.0f}% (n={v})", ha="center", va="center",
+                                 fontsize=12, fontweight="bold", color="white")
+            riesgos = {}
+            if "Vacunadas" in df.columns:
+                riesgos["No vacuna"] = (df["Vacunadas"].astype(str).str.lower() == "no").mean() * 100
+            if "Desparasitadas" in df.columns:
+                riesgos["No desparasita"] = (df["Desparasitadas"].astype(str).str.lower() == "no").mean() * 100
+            if {"Vacunadas", "Desparasitadas"} <= set(df.columns):
+                riesgos["Ninguna\nde las 2"] = ((df["Vacunadas"].astype(str).str.lower() == "no") &
+                                                (df["Desparasitadas"].astype(str).str.lower() == "no")).mean() * 100
+            if riesgos:
+                names = list(riesgos.keys())
+                vals = list(riesgos.values())
+                colors = [YELLOW, ACCENT, RED][:len(vals)]
+                ax2.bar(names, vals, color=colors, edgecolor="white")
+                ax2.set_title("Brecha sanitaria (% de hogares)")
+                ax2.set_ylim(0, max(vals + [10]) * 1.30)
+                _label_bars_v(ax2, vals, fmt="{:.0f}%")
+            return fig
+        _add_page(_build_salud, "salud")
+
+        # ── PÁGINA: DEMOGRAFÍA ─────────────────────────────────────
+        def _build_demografia():
+            fig, axes = plt.subplots(2, 2, figsize=(13, 9))
+            fig.suptitle("10. Demografía y composición", fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2, ax3, ax4 = axes.flat
+            if "Integrantes_Familia" in df.columns and "Mascota_Castrada" in df.columns:
+                tmp = df.copy()
+                tmp["_int"] = pd.to_numeric(tmp["Integrantes_Familia"], errors="coerce")
+                tmp = tmp.dropna(subset=["_int"])
+                if not tmp.empty:
+                    tmp["bucket"] = pd.cut(tmp["_int"], bins=[0, 1, 2, 4, 6, 99],
+                                           labels=["1", "2", "3-4", "5-6", "7+"])
+                    g = tmp.groupby("bucket", observed=True).apply(
+                        lambda s: (s["Mascota_Castrada"].astype(str).str.lower() == "si").mean() * 100)
+                    ax1.bar([str(x) for x in g.index], g.values, color=ACCENT, edgecolor="white")
+                    ax1.set_title("% castración según tamaño de familia")
+                    ax1.set_ylim(0, 115)
+                    _label_bars_v(ax1, g.values, fmt="{:.0f}%")
+            if "Integrantes_Familia" in df.columns and "Total_Mascotas" in df.columns:
+                tmp = df.copy()
+                tmp["_int"] = pd.to_numeric(tmp["Integrantes_Familia"], errors="coerce")
+                tmp["_tot"] = pd.to_numeric(tmp["Total_Mascotas"], errors="coerce")
+                tmp = tmp.dropna(subset=["_int", "_tot"])
+                tmp = tmp[tmp["_int"] > 0]
+                if not tmp.empty and "Tipo_Vivienda" in tmp.columns:
+                    tmp["dens"] = tmp["_tot"] / tmp["_int"]
+                    g = tmp.groupby("Tipo_Vivienda")["dens"].mean().sort_values()
+                    ax2.barh(g.index.astype(str), g.values, color=PURPLE, edgecolor="white")
+                    ax2.set_title("Mascotas por persona, según vivienda")
+                    if g.max() > 0:
+                        ax2.set_xlim(0, _safe_max(g.values, 1.0) * 1.25)
+                    for i, v in enumerate(g.values):
+                        ax2.text(v + g.max() * 0.02, i, f"{v:.2f}",
+                                 va="center", fontsize=9, fontweight="bold", color=NAVY)
+            if "Total_Mascotas" in df.columns and "Barrio" in df.columns:
+                tmp = df.copy()
+                tmp["_tot"] = pd.to_numeric(tmp["Total_Mascotas"], errors="coerce").fillna(0)
+                muchos = tmp[tmp["_tot"] >= 4]
+                if len(muchos) > 0 and not muchos["Barrio"].dropna().empty:
+                    top = muchos["Barrio"].value_counts().head(8).iloc[::-1]
+                    top_max = _safe_max(top.values)
+                    ax3.barh(top.index.astype(str), top.values, color=YELLOW, edgecolor="white")
+                    ax3.set_title("Hogares con ≥4 mascotas")
+                    ax3.set_xlim(0, top_max * 1.25)
+                    for i, v in enumerate(top.values):
+                        ax3.text(v + top_max * 0.02, i, f"{int(v)}",
+                                 va="center", fontsize=9, fontweight="bold", color=NAVY)
+                else:
+                    _empty_panel(ax3, "Sin hogares con ≥4 mascotas")
+            if "Mascota_Castrada" in df.columns:
+                no_cast = df[df["Mascota_Castrada"].astype(str).str.lower() == "no"]
+                def _s(c):
+                    return float(pd.to_numeric(no_cast[c], errors="coerce").fillna(0).sum()) \
+                        if c in no_cast.columns else 0.0
+                cats = ["Perros\n(hembra)", "Perros\n(macho)", "Gatos\n(hembra)", "Gatos\n(macho)"]
+                vals = [_s("Perros_Hembra"), _s("Perros_Macho"),
+                        _s("Gatos_Hembra"), _s("Gatos_Macho")]
+                cols_b = [RED, ACCENT, RED, ACCENT]
+                ax4.bar(cats, vals, color=cols_b, edgecolor="white")
+                ax4.set_title("Animales SIN castrar por sexo")
+                max_v = max(vals + [1])
+                ax4.set_ylim(0, max_v * 1.18)
+                for i, v in enumerate(vals):
+                    if v > 0:
+                        ax4.text(i, v + max_v * 0.02, f"{int(v)}",
+                                 ha="center", fontsize=10, fontweight="bold", color=NAVY)
+            return fig
+        _add_page(_build_demografia, "demografia")
+
+        # ── PÁGINA: ACCIÓN MUNICIPAL ───────────────────────────────
+        def _build_accion():
+            fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+            fig.suptitle("11. Acción municipal", fontsize=14, fontweight="bold", color=NAVY)
+            ax1, ax2, ax3 = axes
+            if "CastEn_Municipio" in df.columns and "Sabe_Castracion_Gratuita" in df.columns:
+                tmp = df.copy()
+                tmp["_cm"] = pd.to_numeric(tmp["CastEn_Municipio"], errors="coerce").fillna(0)
+                tmp["_cm_lbl"] = tmp["_cm"].map({1: "Castró por\nel municipio",
+                                                  0: "Otros / no\ncastró"})
+                g = tmp.groupby("_cm_lbl").apply(
+                    lambda s: (s["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si").mean() * 100)
+                g_vals = g.to_numpy(dtype=float)
+                ax1.bar(g.index.astype(str), g_vals, color=[GREEN, YELLOW][:len(g)], edgecolor="white")
+                ax1.set_title("% que sabe sobre\ncastración gratuita")
+                ax1.set_ylim(0, 110)
+                _label_bars_v(ax1, g_vals, fmt="{:.0f}%")
+            if "Mun_Castraciones_Masivas" in df.columns and "Mascota_Castrada" in df.columns:
+                tmp = df.copy()
+                tmp["_pide"] = pd.to_numeric(tmp["Mun_Castraciones_Masivas"], errors="coerce").fillna(0)
+                tmp["_pide_lbl"] = tmp["_pide"].map({1: "Pide castr.\nmasivas", 0: "No las pide"})
+                g = tmp.groupby("_pide_lbl").apply(
+                    lambda s: (s["Mascota_Castrada"].astype(str).str.lower() == "no").mean() * 100)
+                g_vals = g.to_numpy(dtype=float)
+                ax2.bar(g.index.astype(str), g_vals, color=[RED, ACCENT][:len(g)], edgecolor="white")
+                ax2.set_title("% SIN castrar, según si\npide castr. masivas")
+                ax2.set_ylim(0, 110)
+                _label_bars_v(ax2, g_vals, fmt="{:.0f}%")
+            col_no_part = "Mun_No_es_necesaria_la_participación_del_municipio"
+            if col_no_part in df.columns and "Barrio" in df.columns:
+                tmp = df.copy()
+                tmp["_no_mun"] = pd.to_numeric(tmp[col_no_part], errors="coerce").fillna(0)
+                g = tmp.groupby("Barrio").agg(no_demanda=("_no_mun", "mean"),
+                                              nn=("_no_mun", "size"))
+                g = g[g["nn"] >= 3].sort_values("no_demanda", ascending=True).tail(8)
+                if not g.empty:
+                    pcts = g["no_demanda"].to_numpy(dtype=float) * 100
+                    ax3.barh(g.index.astype(str), pcts, color=RED, edgecolor="white")
+                    ax3.set_title("Barrios con más hogares que dicen\n«no es necesaria la participación»")
+                    _max = float(pcts.max()) if len(pcts) else 10
+                    ax3.set_xlim(0, _max * 1.25)
+                    for i, v in enumerate(pcts):
+                        ax3.text(v + _max * 0.02, i, f"{v:.0f}%", va="center",
+                                 fontsize=9, fontweight="bold", color=NAVY)
+            return fig
+        _add_page(_build_accion, "accion_mun")
+
     buf.seek(0)
     return buf.getvalue()
 
@@ -1307,14 +1947,16 @@ def construir_pdf(df: pd.DataFrame) -> bytes:
 col_pdf, _ = st.columns([1, 4])
 with col_pdf:
     if st.button("Generar PDF", type="primary"):
-        with st.spinner("Generando reporte..."):
-            pdf_bytes = construir_pdf(df)
+        with st.spinner("Generando reporte completo..."):
+            filtros_info = _filtros_a_texto(ciudades, barrios, viviendas, tipos_mascota)
+            pdf_bytes = construir_pdf(df, filtros_info=filtros_info)
         st.download_button(
             "⬇️ Descargar reporte.pdf",
             data=pdf_bytes,
             file_name=f"reporte_mascotas_{datetime.now():%Y%m%d_%H%M}.pdf",
             mime="application/pdf",
         )
+        st.success(f"PDF generado con {len(df):,} encuestas filtradas — incluye portada, guía de lectura y 12 páginas de gráficos.".replace(",", "."))
 
 st.markdown(
     f"<div style='text-align:center; color:#7a8b99; font-size:12px; margin-top:30px; "
