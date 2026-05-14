@@ -1199,23 +1199,8 @@ with tabs[10]:
         "Acción municipal",
         "Efecto del municipio en la castración y barrios con baja demanda institucional.",
     )
-    fig, axes = plt.subplots(1, 3, figsize=(17, 5))
-    ax1, ax2, ax3 = axes
-
-    if "CastEn_Municipio" in df.columns and "Sabe_Castracion_Gratuita" in df.columns:
-        tmp = df.copy()
-        tmp["_cm"] = pd.to_numeric(tmp["CastEn_Municipio"], errors="coerce").fillna(0)
-        tmp["_cm_lbl"] = tmp["_cm"].map({1: "Castró por\nel municipio",
-                                          0: "Otros / no\ncastró"})
-        g = tmp.groupby("_cm_lbl").apply(
-            lambda s: (s["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si").mean() * 100)
-        g_vals = g.to_numpy(dtype=float)
-        ax1.bar(g.index.astype(str), g_vals, color=[GREEN, YELLOW][:len(g)],
-                edgecolor="white")
-        ax1.set_title("% que sabe sobre\ncastración gratuita")
-        ax1.set_ylabel("%")
-        ax1.set_ylim(0, 110)
-        _label_bars_v(ax1, g_vals, fmt="{:.0f}%")
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+    ax1, ax2 = axes
 
     if "Mun_Castraciones_Masivas" in df.columns and "Mascota_Castrada" in df.columns:
         tmp = df.copy()
@@ -1224,12 +1209,12 @@ with tabs[10]:
         g = tmp.groupby("_pide_lbl").apply(
             lambda s: (s["Mascota_Castrada"].astype(str).str.lower() == "no").mean() * 100)
         g_vals = g.to_numpy(dtype=float)
-        ax2.bar(g.index.astype(str), g_vals, color=[RED, ACCENT][:len(g)],
+        ax1.bar(g.index.astype(str), g_vals, color=[RED, ACCENT][:len(g)],
                 edgecolor="white")
-        ax2.set_title("% SIN castrar, según si\npide castr. masivas")
-        ax2.set_ylabel("% sin castrar")
-        ax2.set_ylim(0, 110)
-        _label_bars_v(ax2, g_vals, fmt="{:.0f}%")
+        ax1.set_title("% SIN castrar, según si\npide castr. masivas")
+        ax1.set_ylabel("% sin castrar")
+        ax1.set_ylim(0, 110)
+        _label_bars_v(ax1, g_vals, fmt="{:.0f}%")
 
     col_no_part = "Mun_No_es_necesaria_la_participación_del_municipio"
     if col_no_part in df.columns and "Barrio" in df.columns:
@@ -1240,22 +1225,20 @@ with tabs[10]:
         g = g[g["n"] >= 3].sort_values("no_demanda", ascending=True).tail(8)
         if not g.empty:
             pcts = g["no_demanda"].to_numpy(dtype=float) * 100
-            ax3.barh(g.index.astype(str), pcts, color=RED, edgecolor="white")
-            ax3.set_title("Barrios donde más hogares dicen\n«no es necesaria la participación del municipio»")
-            ax3.set_xlabel("% del barrio")
+            ax2.barh(g.index.astype(str), pcts, color=RED, edgecolor="white")
+            ax2.set_title("Barrios donde más hogares dicen\n«no es necesaria la participación del municipio»")
+            ax2.set_xlabel("% del barrio")
             _max = float(pcts.max()) if len(pcts) else 10
-            ax3.set_xlim(0, _max * 1.25)
+            ax2.set_xlim(0, _max * 1.25)
             for i, v in enumerate(pcts):
-                ax3.text(v + _max * 0.02, i, f"{v:.0f}%", va="center",
+                ax2.text(v + _max * 0.02, i, f"{v:.0f}%", va="center",
                          fontsize=9, fontweight="bold", color=NAVY)
     fig.tight_layout(pad=1.5)
     _render_fig(fig, "accion_mun")
     st.caption(
-        "📌 Cómo leer este gráfico: si ambas barras muestran valores similares, "
-        "significa que conocer el servicio de castración gratuita no es lo que diferencia "
-        "a quienes castran de quienes no — el desconocimiento no es la barrera principal. "
-        "En cambio, si las barras difieren notablemente, entonces el acceso a la información "
-        "sí estaría influyendo en la decisión."
+        "📌 Cómo leer: el panel izquierdo compara la tasa de NO castración entre "
+        "hogares que piden castraciones masivas y los que no. El panel derecho "
+        "muestra los barrios donde más se rechaza la participación del municipio."
     )
 
 
@@ -1900,21 +1883,9 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
 
         # ── PÁGINA: ACCIÓN MUNICIPAL ───────────────────────────────
         def _build_accion():
-            fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+            fig, axes = plt.subplots(1, 2, figsize=(13, 5))
             fig.suptitle("11. Acción municipal", fontsize=14, fontweight="bold", color=NAVY)
-            ax1, ax2, ax3 = axes
-            if "CastEn_Municipio" in df.columns and "Sabe_Castracion_Gratuita" in df.columns:
-                tmp = df.copy()
-                tmp["_cm"] = pd.to_numeric(tmp["CastEn_Municipio"], errors="coerce").fillna(0)
-                tmp["_cm_lbl"] = tmp["_cm"].map({1: "Castró por\nel municipio",
-                                                  0: "Otros / no\ncastró"})
-                g = tmp.groupby("_cm_lbl").apply(
-                    lambda s: (s["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si").mean() * 100)
-                g_vals = g.to_numpy(dtype=float)
-                ax1.bar(g.index.astype(str), g_vals, color=[GREEN, YELLOW][:len(g)], edgecolor="white")
-                ax1.set_title("% que sabe sobre\ncastración gratuita")
-                ax1.set_ylim(0, 110)
-                _label_bars_v(ax1, g_vals, fmt="{:.0f}%")
+            ax1, ax2 = axes
             if "Mun_Castraciones_Masivas" in df.columns and "Mascota_Castrada" in df.columns:
                 tmp = df.copy()
                 tmp["_pide"] = pd.to_numeric(tmp["Mun_Castraciones_Masivas"], errors="coerce").fillna(0)
@@ -1922,10 +1893,10 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
                 g = tmp.groupby("_pide_lbl").apply(
                     lambda s: (s["Mascota_Castrada"].astype(str).str.lower() == "no").mean() * 100)
                 g_vals = g.to_numpy(dtype=float)
-                ax2.bar(g.index.astype(str), g_vals, color=[RED, ACCENT][:len(g)], edgecolor="white")
-                ax2.set_title("% SIN castrar, según si\npide castr. masivas")
-                ax2.set_ylim(0, 110)
-                _label_bars_v(ax2, g_vals, fmt="{:.0f}%")
+                ax1.bar(g.index.astype(str), g_vals, color=[RED, ACCENT][:len(g)], edgecolor="white")
+                ax1.set_title("% SIN castrar, según si\npide castr. masivas")
+                ax1.set_ylim(0, 110)
+                _label_bars_v(ax1, g_vals, fmt="{:.0f}%")
             col_no_part = "Mun_No_es_necesaria_la_participación_del_municipio"
             if col_no_part in df.columns and "Barrio" in df.columns:
                 tmp = df.copy()
@@ -1935,12 +1906,12 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
                 g = g[g["nn"] >= 3].sort_values("no_demanda", ascending=True).tail(8)
                 if not g.empty:
                     pcts = g["no_demanda"].to_numpy(dtype=float) * 100
-                    ax3.barh(g.index.astype(str), pcts, color=RED, edgecolor="white")
-                    ax3.set_title("Barrios con más hogares que dicen\n«no es necesaria la participación»")
+                    ax2.barh(g.index.astype(str), pcts, color=RED, edgecolor="white")
+                    ax2.set_title("Barrios con más hogares que dicen\n«no es necesaria la participación»")
                     _max = float(pcts.max()) if len(pcts) else 10
-                    ax3.set_xlim(0, _max * 1.25)
+                    ax2.set_xlim(0, _max * 1.25)
                     for i, v in enumerate(pcts):
-                        ax3.text(v + _max * 0.02, i, f"{v:.0f}%", va="center",
+                        ax2.text(v + _max * 0.02, i, f"{v:.0f}%", va="center",
                                  fontsize=9, fontweight="bold", color=NAVY)
             return fig
         _add_page(_build_accion, "accion_mun")
