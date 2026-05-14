@@ -45,6 +45,65 @@ PURPLE = "#4895ef"      # azul cielo (datos secundarios)
 BORDER = "#cfd8dc"
 TEXT_ON_ACCENT = "#ffffff"
 
+# ── Notas explicativas por pestaña ──────────────────────────────────────────
+# Cada nota aclara (a) qué representa el % o el conteo del gráfico y
+# (b) cómo leerlo. Recordar: cada fila del CSV = 1 ENCUESTA = 1 HOGAR.
+# Los % nunca son por mascota individual: el dato se releva a nivel hogar.
+TAB_NOTES = {
+    "Resumen": (
+        "% calculado sobre HOGARES encuestados (cada fila = 1 encuesta). "
+        "Lectura: los totales de perros/gatos suman animales; los % de "
+        "castración/vacunación son hogares que declararon 'Sí'."
+    ),
+    "Castración": (
+        "% = hogares que declaran tener la mascota castrada / total de "
+        "hogares filtrados. No es por animal individual: si el hogar "
+        "tiene 3 mascotas y respondió 'Sí', se cuenta como 1 hogar 'Sí'."
+    ),
+    "Geografía": (
+        "Los valores son por hogar agregado por barrio/ciudad. "
+        "'Cantidad' = nº de encuestas en esa zona, no nº de mascotas."
+    ),
+    "Barrios Prioritarios": (
+        "Ranking por VOLUMEN ABSOLUTO de hogares sin castrar (no por %). "
+        "Útil para priorizar dónde una campaña impactaría a más animales."
+    ),
+    "Municipio": (
+        "% = hogares que respondieron 'Sí' a cada pedido municipal. "
+        "Una misma encuesta puede pedir varias cosas a la vez."
+    ),
+    "Cuidado": (
+        "% = hogares que respondieron 'Sí'. ACCIONES (castrar, vacunar, "
+        "desparasitar) y CONOCIMIENTO (saber que existe el servicio "
+        "gratuito) se muestran por separado: un hogar puede saber pero "
+        "no actuar, o actuar sin conocer todo lo disponible."
+    ),
+    "Callejeros": (
+        "Frecuencia de avistaje y de animales perdidos declarada por el "
+        "hogar encuestado, no medición directa de la vía pública."
+    ),
+    "Brecha Informativa": (
+        "Compara hogares que SABEN del servicio vs los que NO. "
+        "El % es siempre sobre el subgrupo correspondiente."
+    ),
+    "Insights": (
+        "Cruces estadísticos sobre el dataset filtrado. % siempre sobre "
+        "hogares; los conteos son hogares, no animales."
+    ),
+    "Salud Pública": (
+        "% calculado sobre hogares: prevalencia de vacunación, "
+        "desparasitación y castración. Indicador de cobertura sanitaria."
+    ),
+    "Demografía": (
+        "Distribución por tipo de vivienda e integrantes. Conteos = "
+        "hogares; promedios = animales por hogar."
+    ),
+    "Acción Municipal": (
+        "% = hogares que solicitan cada acción concreta al municipio. "
+        "Ranking de demanda ciudadana, no de oferta del municipio."
+    ),
+}
+
 # Mapeo de nombres internos → etiquetas amigables para mostrar al usuario
 FRIENDLY_LABELS = {
     "Tipo_Vivienda": "Tipo de vivienda",
@@ -223,6 +282,7 @@ class Dashboard(tk.Tk):
         self._populate_filters()
         # Mapa de pestañas → función dibujadora (lazy redraw)
         self._drawers = {
+            "Sugerencias": self._draw_sugerencias,
             "Resumen": self._draw_resumen,
             "Castración": self._draw_castracion,
             "Geografía": self._draw_geografia,
@@ -392,7 +452,8 @@ class Dashboard(tk.Tk):
         chart_tabs = ["Resumen", "Castración", "Geografía", "Barrios Prioritarios",
                       "Municipio", "Cuidado", "Callejeros", "Brecha Informativa",
                       "Insights", "Salud Pública", "Demografía", "Acción Municipal"]
-        for nombre in chart_tabs + ["Tabla"]:
+        # "Sugerencias" va primero (guía de lectura), "Tabla" al final.
+        for nombre in ["Sugerencias"] + chart_tabs + ["Tabla"]:
             tab = ttk.Frame(self.notebook, style="Panel.TFrame")
             self.notebook.add(tab, text=nombre)
             self.tabs[nombre] = tab
@@ -775,6 +836,13 @@ class Dashboard(tk.Tk):
         except Exception:
             pass
         build_fn(fig)
+        # Nota interpretativa al pie (qué significa el % y cómo leer el gráfico)
+        nota = TAB_NOTES.get(nombre)
+        if nota:
+            wrapped = textwrap.fill(nota, width=130)
+            fig.text(0.012, 0.005, "Nota: " + wrapped,
+                     fontsize=7.5, color=FG_TEXT, style="italic",
+                     ha="left", va="bottom", wrap=True)
         self.tab_canvases[nombre].draw_idle()
 
     def _on_canvas_resize(self, nombre, w_px, h_px):
@@ -1113,33 +1181,66 @@ class Dashboard(tk.Tk):
                 fig.text(0.5, 0.5, "Sin datos con los filtros aplicados",
                          ha="center", va="center", color=FG_TEXT, fontsize=14)
                 return
-            ax1 = fig.add_subplot(1, 2, 1)
-            cuidado = ["Mascota_Castrada", "Vacunadas", "Desparasitadas",
-                       "Sabe_Castracion_Gratuita", "Sabe_Vacunas_Anuales"]
-            pcts = [(df[c] == "Si").mean() * 100 for c in cuidado]
-            labels = ["Castradas", "Vacunadas", "Desparasit.", "Sabe Cast.\nGratis", "Sabe Vac.\nAnuales"]
-            bars = ax1.bar(labels, pcts, color=[YELLOW, GREEN, GREEN, ACCENT, ACCENT],
+
+            # 1) ACCIONES de cuidado (lo que el hogar HIZO)
+            ax1 = fig.add_subplot(2, 2, 1)
+            acciones = ["Mascota_Castrada", "Vacunadas", "Desparasitadas"]
+            pcts_a = [(df[c] == "Si").mean() * 100 for c in acciones]
+            labels_a = ["Castradas", "Vacunadas", "Desparasit."]
+            bars = ax1.bar(labels_a, pcts_a, color=[YELLOW, GREEN, ACCENT],
                            edgecolor=BG_DARK)
-            ax1.set_title("Indicadores de cuidado (%)")
+            ax1.set_title("Acciones de cuidado\n(% de hogares que respondieron 'Sí')")
             ax1.set_ylim(0, 110)
-            for bar, val in zip(bars, pcts):
+            ax1.set_ylabel("% de hogares")
+            for bar, val in zip(bars, pcts_a):
                 ax1.text(bar.get_x() + bar.get_width() / 2, val + 2,
                          f"{val:.1f}%", ha="center", fontsize=9, fontweight="bold",
                          color=FG_TEXT)
 
-            ax2 = fig.add_subplot(1, 2, 2)
+            # 2) CONOCIMIENTO sobre servicios disponibles (lo que el hogar SABE)
+            ax2 = fig.add_subplot(2, 2, 2)
+            conoc = ["Sabe_Castracion_Gratuita", "Sabe_Vacunas_Anuales"]
+            pcts_c = [(df[c] == "Si").mean() * 100 for c in conoc]
+            labels_c = ["Sabe Cast.\nGratuita", "Sabe Vac.\nAnuales"]
+            bars2 = ax2.bar(labels_c, pcts_c, color=[PURPLE, PURPLE],
+                            edgecolor=BG_DARK)
+            ax2.set_title("Conocimiento de servicios\n(% de hogares que saben que existe)")
+            ax2.set_ylim(0, 110)
+            ax2.set_ylabel("% de hogares")
+            for bar, val in zip(bars2, pcts_c):
+                ax2.text(bar.get_x() + bar.get_width() / 2, val + 2,
+                         f"{val:.1f}%", ha="center", fontsize=9, fontweight="bold",
+                         color=FG_TEXT)
+
+            # 3) Acciones por tipo de vivienda
+            ax3 = fig.add_subplot(2, 2, 3)
             g = df.groupby("Tipo_Vivienda").apply(
                 lambda x: pd.Series({
                     "Castradas": (x["Mascota_Castrada"] == "Si").mean() * 100,
                     "Vacunadas": (x["Vacunadas"] == "Si").mean() * 100,
                     "Desparasit.": (x["Desparasitadas"] == "Si").mean() * 100,
                 }))
-            g.plot(kind="bar", ax=ax2, color=[YELLOW, GREEN, ACCENT], edgecolor=BG_DARK)
-            ax2.set_title("Indicadores de cuidado por tipo de vivienda (%)")
-            ax2.set_ylabel("%")
-            ax2.set_ylim(0, 110)
-            ax2.tick_params(axis="x", rotation=15)
-            ax2.legend(loc="lower right", fontsize=8)
+            g.plot(kind="bar", ax=ax3, color=[YELLOW, GREEN, ACCENT], edgecolor=BG_DARK)
+            ax3.set_title("Acciones por tipo de vivienda\n(% de hogares en cada categoría)")
+            ax3.set_ylabel("% de hogares")
+            ax3.set_ylim(0, 110)
+            ax3.tick_params(axis="x", rotation=15)
+            ax3.legend(loc="lower right", fontsize=8)
+
+            # 4) Brecha conocimiento → acción: ¿los que saben, castran más?
+            ax4 = fig.add_subplot(2, 2, 4)
+            sabe = df["Sabe_Castracion_Gratuita"] == "Si"
+            cat_yes = (df[sabe]["Mascota_Castrada"] == "Si").mean() * 100 if sabe.any() else 0
+            cat_no = (df[~sabe]["Mascota_Castrada"] == "Si").mean() * 100 if (~sabe).any() else 0
+            bars3 = ax4.bar(["Sabe del\nservicio", "No sabe del\nservicio"],
+                            [cat_yes, cat_no], color=[GREEN, RED], edgecolor=BG_DARK)
+            ax4.set_title("¿Conocer el servicio se traduce en castrar?\n(% de hogares con mascota castrada)")
+            ax4.set_ylabel("% castradas")
+            ax4.set_ylim(0, 110)
+            for bar, val in zip(bars3, [cat_yes, cat_no]):
+                ax4.text(bar.get_x() + bar.get_width() / 2, val + 2,
+                         f"{val:.1f}%", ha="center", fontsize=9, fontweight="bold",
+                         color=FG_TEXT)
         self._redraw_fig("Cuidado", build)
 
     # ── Barrios prioritarios (volumen absoluto sin castrar) ────────────────
@@ -1785,8 +1886,125 @@ class Dashboard(tk.Tk):
                                  fontsize=9, fontweight="bold", color=FG_TEXT)
         self._redraw_fig("Acción Municipal", build)
 
-    # ── Tabla ─────────────────────────────────────────────────────────────
-    def _draw_tabla(self):
+    # ── Sugerencias / Guía de lectura ─────────────────────────────────────
+    def _draw_sugerencias(self):
+        self._clear(self.tabs["Sugerencias"])
+        frame = self.tabs["Sugerencias"]
+
+        # Encabezado
+        head = ttk.Frame(frame, style="Panel.TFrame", padding=12)
+        head.pack(fill="x")
+        ttk.Label(head, text="📖 Cómo leer este dashboard",
+                  style="Title.TLabel").pack(side="left")
+
+        # Texto principal (scrolleable)
+        cont = ttk.Frame(frame, style="Panel.TFrame")
+        cont.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        txt = tk.Text(cont, wrap="word", bg=BG_PANEL, fg=FG_TEXT,
+                      font=("Segoe UI", 11), borderwidth=0,
+                      highlightthickness=0, padx=14, pady=10)
+        vsb = ttk.Scrollbar(cont, orient="vertical", command=txt.yview)
+        txt.configure(yscrollcommand=vsb.set)
+        txt.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+
+        # Estilos para títulos / bullets
+        txt.tag_configure("h1", font=("Segoe UI", 14, "bold"),
+                          foreground=ACCENT, spacing1=14, spacing3=6)
+        txt.tag_configure("h2", font=("Segoe UI", 12, "bold"),
+                          foreground=FG_TEXT, spacing1=10, spacing3=4)
+        txt.tag_configure("bold", font=("Segoe UI", 11, "bold"))
+        txt.tag_configure("warn", foreground=RED, font=("Segoe UI", 11, "bold"))
+        txt.tag_configure("ok", foreground=GREEN, font=("Segoe UI", 11, "bold"))
+        txt.tag_configure("bullet", lmargin1=24, lmargin2=44, spacing3=4)
+
+        def w(s, tag=None):
+            txt.insert("end", s, tag) if tag else txt.insert("end", s)
+
+        # === Contenido ===
+        w("Antes de mirar cualquier gráfico\n", "h1")
+        w("Este dashboard se arma sobre encuestas a hogares. "
+          "Es importante tener presente lo siguiente:\n\n")
+
+        w("⚠ Cada fila = 1 encuesta = 1 HOGAR, no 1 mascota.\n", "warn")
+        w("Cuando un gráfico dice ", "bullet")
+        w("'% castradas'", "bold")
+        w(", se refiere al % de HOGARES que respondieron 'Sí' a la pregunta. "
+          "Si un hogar tiene 3 mascotas y respondió 'Sí', cuenta como 1 hogar 'Sí' "
+          "— no sabemos si las 3 están castradas o solo 1.\n", "bullet")
+
+        w("\nPor dónde empezar\n", "h1")
+        w("Sugerencia de recorrido (de lo general a lo específico):\n\n")
+
+        w("1. Resumen", "h2"); w("\n")
+        w("  • Mirá los KPIs de arriba: cuántos hogares hay con el filtro actual, "
+          "cuántos animales suman, y los % globales de cuidado.\n", "bullet")
+
+        w("2. Cuidado", "h2"); w("\n")
+        w("  • Es el corazón sanitario. Comparás 'lo que el hogar HIZO' (castrar, "
+          "vacunar, desparasitar) con 'lo que SABE' (servicios gratuitos). "
+          "La brecha entre ambos te dice si falta comunicación o falta acción.\n", "bullet")
+
+        w("3. Castración", "h2"); w("\n")
+        w("  • Profundizás en el indicador más prioritario para el municipio "
+          "(control reproductivo). Cruces por vivienda, tipo de mascota y barrio.\n", "bullet")
+
+        w("4. Geografía + Barrios Prioritarios", "h2"); w("\n")
+        w("  • Geografía: dónde están los hogares. Barrios Prioritarios: dónde "
+          "una campaña impactaría a MÁS animales (volumen absoluto, no %).\n", "bullet")
+
+        w("5. Municipio + Acción Municipal", "h2"); w("\n")
+        w("  • Qué le piden los vecinos al municipio. Útil para priorizar políticas "
+          "públicas según demanda real.\n", "bullet")
+
+        w("6. Brecha Informativa", "h2"); w("\n")
+        w("  • Compara hogares informados vs no informados. Si la brecha es grande, "
+          "el problema es comunicación; si es chica, el problema es acceso.\n", "bullet")
+
+        w("7. Salud Pública / Callejeros / Demografía", "h2"); w("\n")
+        w("  • Lecturas complementarias para contextualizar.\n", "bullet")
+
+        w("8. Insights", "h2"); w("\n")
+        w("  • Cruces estadísticos automáticos. Mirá al final, ya con preguntas "
+          "concretas en la cabeza.\n", "bullet")
+
+        w("9. Tabla", "h2"); w("\n")
+        w("  • Datos crudos filtrados. Exportable a CSV para análisis externos.\n", "bullet")
+
+        w("\nCómo usar los filtros\n", "h1")
+        w("  • Usá los filtros de arriba (Ciudad, Barrio, Tipo de Vivienda, Tipo de "
+          "Mascota) para acotar el análisis. ", "bullet")
+        w("Todos los gráficos y KPIs se recalculan automáticamente con el filtro "
+          "aplicado.\n", "bullet")
+        w("  • Si una pestaña muestra 'Sin datos con los filtros aplicados', "
+          "afloja un filtro.\n", "bullet")
+
+        w("\nQué significa cada color\n", "h1")
+        w("  • ", "bullet"); w("Verde", "ok")
+        w(": indicadores positivos (vacunados, castrados, informados).\n", "bullet")
+        w("  • ", "bullet"); w("Naranja/Amarillo", "bold")
+        w(": indicadores intermedios o de precaución.\n", "bullet")
+        w("  • ", "bullet"); w("Rojo", "warn")
+        w(": alertas, hogares sin acción o sin información.\n", "bullet")
+
+        w("\nLecturas frecuentes (qué responde el dashboard)\n", "h1")
+        w("  • ¿Dónde concentrar una campaña de castración? → Barrios Prioritarios.\n", "bullet")
+        w("  • ¿La gente no castra porque no sabe o porque no quiere? → "
+          "Brecha Informativa + pestaña Cuidado (cuarto cuadro).\n", "bullet")
+        w("  • ¿Qué tipo de vivienda tiene peor cobertura sanitaria? → "
+          "Cuidado (tercer cuadro).\n", "bullet")
+        w("  • ¿Qué le piden los vecinos al municipio? → Acción Municipal.\n", "bullet")
+
+        w("\nLimitaciones del dato\n", "h1")
+        w("  • Es ", "bullet"); w("autodeclarado", "bold")
+        w(": no hay padrón ni chip que valide especie, sexo o castración real.\n", "bullet")
+        w("  • Hay nulos importantes en cantidades de perros/gatos por sexo "
+          "(no siempre se puede saber si es 0 o 'no respondió').\n", "bullet")
+        w("  • La muestra refleja a quienes aceptaron responder la encuesta — "
+          "puede tener sesgo hacia hogares más involucrados con sus mascotas.\n", "bullet")
+
+        txt.configure(state="disabled")
         self._clear(self.tabs["Tabla"])
         df = self.df
 
