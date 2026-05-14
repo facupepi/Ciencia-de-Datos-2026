@@ -621,8 +621,8 @@ with tabs[1]:
         "Castración",
         "Dónde castran y cómo influye conocer que es gratuita.",
     )
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5))
-    ax1, ax2, ax3 = axes
+    fig, axes = plt.subplots(2, 2, figsize=(14, 9))
+    ax1, ax2, ax3, ax4 = axes.flat
 
     if "Mascota_Castrada" in df.columns:
         mc = df["Mascota_Castrada"].value_counts()
@@ -649,6 +649,27 @@ with tabs[1]:
         ax3.set_ylim(0, 110)
         ax3.set_ylabel("% castradas")
         _label_bars_v(ax3, sabe.values, fmt="{:.1f}%")
+
+    if "Mascota_Castrada" in df.columns:
+        no_cast = df[df["Mascota_Castrada"].astype(str).str.lower() == "no"]
+
+        def _s(c):
+            return float(pd.to_numeric(no_cast[c], errors="coerce").fillna(0).sum()) \
+                if c in no_cast.columns else 0.0
+
+        cats = ["Perros\n(hembra)", "Perros\n(macho)", "Gatos\n(hembra)", "Gatos\n(macho)"]
+        vals = [_s("Perros_Hembra"), _s("Perros_Macho"),
+                _s("Gatos_Hembra"), _s("Gatos_Macho")]
+        cols_b = [RED, ACCENT, RED, ACCENT]
+        ax4.bar(cats, vals, color=cols_b, edgecolor="white")
+        ax4.set_title("Animales SIN castrar por sexo")
+        ax4.set_ylabel("Cantidad")
+        max_v = max(vals + [1])
+        ax4.set_ylim(0, max_v * 1.18)
+        for i, v in enumerate(vals):
+            if v > 0:
+                ax4.text(i, v + max_v * 0.02, f"{int(v)}",
+                         ha="center", fontsize=10, fontweight="bold", color=NAVY)
     _render_fig(fig, "castracion")
 
 
@@ -1159,8 +1180,8 @@ with tabs[10]:
         "Demografía y composición",
         "Castración por tamaño familiar y densidad de mascotas.",
     )
-    fig, axes = plt.subplots(2, 2, figsize=(14, 9))
-    ax1, ax2, ax3, ax4 = axes.flat
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5))
+    ax1, ax2, ax3 = axes
 
     if "Integrantes_Familia" in df.columns and "Mascota_Castrada" in df.columns:
         tmp = df.copy()
@@ -1216,26 +1237,6 @@ with tabs[10]:
                      ha="center", va="center", color=NAVY, fontsize=11,
                      transform=ax3.transAxes)
 
-    if "Mascota_Castrada" in df.columns:
-        no_cast = df[df["Mascota_Castrada"].astype(str).str.lower() == "no"]
-
-        def _s(c):
-            return float(pd.to_numeric(no_cast[c], errors="coerce").fillna(0).sum()) \
-                if c in no_cast.columns else 0.0
-
-        cats = ["Perros\n(hembra)", "Perros\n(macho)", "Gatos\n(hembra)", "Gatos\n(macho)"]
-        vals = [_s("Perros_Hembra"), _s("Perros_Macho"),
-                _s("Gatos_Hembra"), _s("Gatos_Macho")]
-        cols_b = [RED, ACCENT, RED, ACCENT]
-        ax4.bar(cats, vals, color=cols_b, edgecolor="white")
-        ax4.set_title("Animales SIN castrar por sexo")
-        ax4.set_ylabel("Cantidad")
-        max_v = max(vals + [1])
-        ax4.set_ylim(0, max_v * 1.18)
-        for i, v in enumerate(vals):
-            if v > 0:
-                ax4.text(i, v + max_v * 0.02, f"{int(v)}",
-                         ha="center", fontsize=10, fontweight="bold", color=NAVY)
     _render_fig(fig, "demografia")
 
 
@@ -1511,9 +1512,9 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
 
         # ── PÁGINA: CASTRACIÓN ─────────────────────────────────────
         def _build_castracion():
-            fig, axes = plt.subplots(1, 3, figsize=(13, 5))
+            fig, axes = plt.subplots(2, 2, figsize=(13, 9))
             fig.suptitle("2. Castración", fontsize=14, fontweight="bold", color=NAVY)
-            ax1, ax2, ax3 = axes
+            ax1, ax2, ax3, ax4 = axes.flat
             if "Mascota_Castrada" in df.columns:
                 mc = df["Mascota_Castrada"].value_counts()
                 colors = [GREEN if str(x).lower() == "si" else RED for x in mc.index]
@@ -1537,6 +1538,23 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
                 ax3.set_ylim(0, 110)
                 ax3.set_ylabel("% castradas")
                 _label_bars_v(ax3, sabe.values, fmt="{:.1f}%")
+            if "Mascota_Castrada" in df.columns:
+                no_cast = df[df["Mascota_Castrada"].astype(str).str.lower() == "no"]
+                def _s(c):
+                    return float(pd.to_numeric(no_cast[c], errors="coerce").fillna(0).sum()) \
+                        if c in no_cast.columns else 0.0
+                cats = ["Perros\n(hembra)", "Perros\n(macho)", "Gatos\n(hembra)", "Gatos\n(macho)"]
+                vals = [_s("Perros_Hembra"), _s("Perros_Macho"),
+                        _s("Gatos_Hembra"), _s("Gatos_Macho")]
+                cols_b = [RED, ACCENT, RED, ACCENT]
+                ax4.bar(cats, vals, color=cols_b, edgecolor="white")
+                ax4.set_title("Animales SIN castrar por sexo")
+                max_v = max(vals + [1])
+                ax4.set_ylim(0, max_v * 1.18)
+                for i, v in enumerate(vals):
+                    if v > 0:
+                        ax4.text(i, v + max_v * 0.02, f"{int(v)}",
+                                 ha="center", fontsize=10, fontweight="bold", color=NAVY)
             return fig
         _add_page(_build_castracion, "castracion")
 
@@ -1910,9 +1928,9 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
 
         # ── PÁGINA: DEMOGRAFÍA ─────────────────────────────────────
         def _build_demografia():
-            fig, axes = plt.subplots(2, 2, figsize=(13, 9))
+            fig, axes = plt.subplots(1, 3, figsize=(13, 5))
             fig.suptitle("10. Demografía y composición", fontsize=14, fontweight="bold", color=NAVY)
-            ax1, ax2, ax3, ax4 = axes.flat
+            ax1, ax2, ax3 = axes
             if "Integrantes_Familia" in df.columns and "Mascota_Castrada" in df.columns:
                 tmp = df.copy()
                 tmp["_int"] = pd.to_numeric(tmp["Integrantes_Familia"], errors="coerce")
@@ -1957,23 +1975,6 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
                                  va="center", fontsize=9, fontweight="bold", color=NAVY)
                 else:
                     _empty_panel(ax3, "Sin hogares con ≥4 mascotas")
-            if "Mascota_Castrada" in df.columns:
-                no_cast = df[df["Mascota_Castrada"].astype(str).str.lower() == "no"]
-                def _s(c):
-                    return float(pd.to_numeric(no_cast[c], errors="coerce").fillna(0).sum()) \
-                        if c in no_cast.columns else 0.0
-                cats = ["Perros\n(hembra)", "Perros\n(macho)", "Gatos\n(hembra)", "Gatos\n(macho)"]
-                vals = [_s("Perros_Hembra"), _s("Perros_Macho"),
-                        _s("Gatos_Hembra"), _s("Gatos_Macho")]
-                cols_b = [RED, ACCENT, RED, ACCENT]
-                ax4.bar(cats, vals, color=cols_b, edgecolor="white")
-                ax4.set_title("Animales SIN castrar por sexo")
-                max_v = max(vals + [1])
-                ax4.set_ylim(0, max_v * 1.18)
-                for i, v in enumerate(vals):
-                    if v > 0:
-                        ax4.text(i, v + max_v * 0.02, f"{int(v)}",
-                                 ha="center", fontsize=10, fontweight="bold", color=NAVY)
             return fig
         _add_page(_build_demografia, "demografia")
 
