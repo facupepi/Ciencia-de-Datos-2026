@@ -480,8 +480,10 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
 tab_names = [
-    "📊 Resumen", "✂️ Castración", "🗺️ Geografía", "⚠️ Barrios prioritarios",
-    "🏛️ Municipio", "💊 Cuidado", "🐕 Callejeros", "📚 Brecha informativa",
+    "📖 Cómo leer", "📊 Resumen", "✂️ Castración", "🗺️ Geografía",
+    "⚠️ Barrios prioritarios", "🏛️ Municipio",
+    "💊 Cuidado · Acciones", "🧠 Cuidado · Conocimiento",
+    "🐕 Callejeros", "📚 Brecha informativa",
     "🩺 Salud pública", "👨‍👩‍👧 Demografía", "🎯 Acción municipal", "📋 Tabla",
 ]
 tabs = st.tabs(tab_names)
@@ -509,8 +511,52 @@ def _label_bars_h(ax, vals, fmt="{:.0f}", offset_pct=0.015):
                 fontsize=8, fontweight="bold", color=NAVY)
 
 
-# ── 1. Resumen ──────────────────────────────────────────────────────────────
+# ── 0. Cómo leer ────────────────────────────────────────────────────────────
 with tabs[0]:
+    _section_header(
+        "Cómo leer este dashboard",
+        "Guía rápida: qué mide cada pestaña, cómo interpretarla y advertencias clave.",
+    )
+    st.markdown(
+        """
+**Unidad de medida.** Todos los porcentajes se calculan sobre **hogares encuestados**
+(no sobre la población general). Un "65% de castración" significa que el 65% de los
+hogares que respondieron declaran tener a sus mascotas castradas.
+
+**Recorrido sugerido.**
+1. **Resumen** → composición general del relevamiento.
+2. **Castración / Cuidado · Acciones** → qué hace efectivamente la gente.
+3. **Cuidado · Conocimiento / Brecha informativa** → qué sabe la gente.
+4. **Geografía / Barrios prioritarios** → dónde concentrar esfuerzo.
+5. **Salud pública / Callejeros** → riesgos comunitarios.
+6. **Demografía / Acción municipal / Municipio** → contexto y demandas.
+
+**Códigos de color.**
+- 🟢 Verde = indicador positivo / acción cumplida.
+- 🟡 Amarillo = atención / estado intermedio.
+- 🔴 Rojo = riesgo o ausencia de cuidado.
+
+**Limitaciones del dato.**
+- Solo se muestran barrios con **≥3 encuestas** para evitar lecturas inestables.
+- Las respuestas son **autodeclaradas**: pueden estar sesgadas por deseabilidad social.
+- Los filtros del panel lateral afectan **todas** las pestañas simultáneamente.
+
+**⚠️ Corrección importante — Cuidado.**
+La sección Cuidado se separó en dos pestañas porque mezclar acciones y conocimiento
+inducía a error:
+- **Cuidado · Acciones** → % de hogares que efectivamente **castran, vacunan o desparasitan**.
+- **Cuidado · Conocimiento** → % de hogares que **saben** sobre castración gratuita o
+  vacunación anual. **Saber no implica actuar** — comparar ambas pestañas mide la
+  brecha información → acción.
+
+**Reporte PDF.** El botón "Generar PDF" en la última pestaña exporta todos los
+gráficos respetando los filtros aplicados, con una nota explicativa al pie de cada página.
+        """
+    )
+
+
+# ── 1. Resumen ──────────────────────────────────────────────────────────────
+with tabs[1]:
     _section_header(
         "Vista general",
         "Composición del relevamiento: tipo de mascotas, viviendas y autopercepción.",
@@ -569,7 +615,7 @@ with tabs[0]:
 
 
 # ── 2. Castración ───────────────────────────────────────────────────────────
-with tabs[1]:
+with tabs[2]:
     _section_header(
         "Castración",
         "Dónde castran y cómo influye conocer que es gratuita.",
@@ -606,7 +652,7 @@ with tabs[1]:
 
 
 # ── 3. Geografía ────────────────────────────────────────────────────────────
-with tabs[2]:
+with tabs[3]:
     _section_header(
         "Geografía",
         "Cobertura por barrio y nivel de castración donde hay datos suficientes.",
@@ -643,7 +689,7 @@ with tabs[2]:
 
 
 # ── 4. Barrios prioritarios ─────────────────────────────────────────────────
-with tabs[3]:
+with tabs[4]:
     _section_header(
         "Barrios prioritarios",
         "Zonas donde concentrar campañas de castración.",
@@ -687,7 +733,7 @@ with tabs[3]:
 
 
 # ── 5. Municipio ────────────────────────────────────────────────────────────
-with tabs[4]:
+with tabs[5]:
     _section_header(
         "Demanda al municipio",
         "Pedidos de la comunidad y distribución por ciudad.",
@@ -772,37 +818,40 @@ with tabs[4]:
     _render_fig(fig, "municipio")
 
 
-# ── 6. Cuidado ──────────────────────────────────────────────────────────────
-with tabs[5]:
+# ── 6a. Cuidado · Acciones ─────────────────────────────────────────────────
+with tabs[6]:
     _section_header(
-        "Cuidado responsable",
-        "Indicadores combinados y diferencias por tipo de vivienda.",
+        "Cuidado · Acciones",
+        "Qué hace efectivamente la gente: castrar, vacunar, desparasitar.",
+    )
+    st.caption(
+        "ACCIONES de cuidado = % de hogares que efectivamente CASTRAN, VACUNAN o "
+        "DESPARASITAN a sus mascotas. Mide práctica real, no intención ni conocimiento."
     )
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
     ax1, ax2 = axes
-    cuidado_cols = ["Mascota_Castrada", "Vacunadas", "Desparasitadas",
-                    "Sabe_Castracion_Gratuita", "Sabe_Vacunas_Anuales"]
-    nombres = ["Castradas", "Vacunadas", "Desparasit.", "Sabe Cast.\nGratis", "Sabe Vac.\nAnuales"]
-    pares = [(n, _pct_si(df[c])) for n, c in zip(nombres, cuidado_cols) if c in df.columns]
+    acc_cols = ["Mascota_Castrada", "Vacunadas", "Desparasitadas"]
+    acc_nombres = ["Castradas", "Vacunadas", "Desparasit."]
+    pares = [(n, _pct_si(df[c])) for n, c in zip(acc_nombres, acc_cols) if c in df.columns]
     if pares:
         labels = [p[0] for p in pares]
         vals = [p[1] for p in pares]
-        colors = [YELLOW, GREEN, GREEN, ACCENT, ACCENT][:len(pares)]
+        colors = [YELLOW, GREEN, ACCENT][:len(pares)]
         ax1.bar(labels, vals, color=colors, edgecolor="white")
-        ax1.set_title("Indicadores de cuidado (%)")
+        ax1.set_title("Acciones de cuidado (%)")
         ax1.set_ylim(0, 110)
         _label_bars_v(ax1, vals, fmt="{:.1f}%")
 
     if "Tipo_Vivienda" in df.columns:
         sub = df.copy()
         cols_b = []
-        for c in ["Mascota_Castrada", "Vacunadas", "Desparasitadas"]:
+        for c in acc_cols:
             if c in sub.columns:
                 sub[c + "_b"] = (sub[c].astype(str).str.lower() == "si").astype(int)
                 cols_b.append(c + "_b")
         if cols_b:
             g = sub.groupby("Tipo_Vivienda")[cols_b].mean() * 100
-            g.columns = ["Castradas", "Vacunadas", "Desparasit."][:len(cols_b)]
+            g.columns = acc_nombres[:len(cols_b)]
             x = np.arange(len(g.index))
             w = 0.27
             colors_b = [YELLOW, GREEN, ACCENT]
@@ -817,15 +866,54 @@ with tabs[5]:
                                  fontsize=7, fontweight="bold", color=NAVY)
             ax2.set_xticks(x)
             ax2.set_xticklabels([_wrap(v, 12) for v in g.index], fontsize=8)
-            ax2.set_title("Cuidado por tipo de vivienda (%)")
+            ax2.set_title("Acciones por tipo de vivienda (%)")
             ax2.set_ylim(0, 110)
             ax2.set_ylabel("%")
             ax2.legend(loc="lower right", fontsize=8)
-    _render_fig(fig, "cuidado")
+    _render_fig(fig, "cuidado_acciones")
+
+
+# ── 6b. Cuidado · Conocimiento ─────────────────────────────────────────────
+with tabs[7]:
+    _section_header(
+        "Cuidado · Conocimiento",
+        "Qué SABE la gente sobre castración gratuita y vacunación anual.",
+    )
+    st.caption(
+        "CONOCIMIENTO = % de hogares que SABEN sobre el servicio. Saber no implica "
+        "actuar — la comparación con la pestaña de Acciones mide la brecha "
+        "información → práctica."
+    )
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
+    ax1, ax2 = axes
+    con_cols = ["Sabe_Castracion_Gratuita", "Sabe_Vacunas_Anuales"]
+    con_nombres = ["Sabe Cast.\nGratis", "Sabe Vac.\nAnuales"]
+    pares = [(n, _pct_si(df[c])) for n, c in zip(con_nombres, con_cols) if c in df.columns]
+    if pares:
+        labels = [p[0] for p in pares]
+        vals = [p[1] for p in pares]
+        ax1.bar(labels, vals, color=[ACCENT, ACCENT][:len(pares)], edgecolor="white")
+        ax1.set_title("Conocimiento de servicios (%)")
+        ax1.set_ylim(0, 110)
+        _label_bars_v(ax1, vals, fmt="{:.1f}%")
+
+    if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
+        sub = df.copy()
+        sub["sabe_b"] = (sub["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si")
+        sub["cast_b"] = (sub["Mascota_Castrada"].astype(str).str.lower() == "si").astype(int) * 100
+        gg = sub.groupby("sabe_b")["cast_b"].mean()
+        etiquetas = ["No sabe que es gratuita", "Sabe que es gratuita"]
+        vals2 = [gg.get(False, 0), gg.get(True, 0)]
+        ax2.bar(etiquetas, vals2, color=[RED, GREEN], edgecolor="white")
+        ax2.set_title("% Castración según conocimiento\nde castración gratuita")
+        ax2.set_ylim(0, 110)
+        ax2.set_ylabel("% Castradas")
+        _label_bars_v(ax2, vals2, fmt="{:.1f}%")
+    _render_fig(fig, "cuidado_conocimiento")
 
 
 # ── 7. Callejeros ───────────────────────────────────────────────────────────
-with tabs[6]:
+with tabs[8]:
     _section_header(
         "Animales en la calle",
         "Frecuencia observada, salidas sin supervisión e identificación.",
@@ -908,7 +996,7 @@ with tabs[6]:
 
 
 # ── 8. Brecha informativa ───────────────────────────────────────────────────
-with tabs[7]:
+with tabs[9]:
     _section_header(
         "Brecha informativa",
         "Distancia entre lo que la gente sabe y lo que efectivamente hace.",
@@ -995,7 +1083,7 @@ with tabs[7]:
 
 
 # ── 9. Salud pública ────────────────────────────────────────────────────────
-with tabs[8]:
+with tabs[10]:
     _section_header(
         "Salud pública",
         "Cruces de vacunación y desparasitación: zonas de riesgo zoonótico.",
@@ -1065,7 +1153,7 @@ with tabs[8]:
 
 
 # ── 10. Demografía ──────────────────────────────────────────────────────────
-with tabs[9]:
+with tabs[11]:
     _section_header(
         "Demografía y composición",
         "Castración por tamaño familiar y densidad de mascotas.",
@@ -1151,7 +1239,7 @@ with tabs[9]:
 
 
 # ── 11. Acción municipal ────────────────────────────────────────────────────
-with tabs[10]:
+with tabs[12]:
     _section_header(
         "Acción municipal",
         "Efecto del municipio en la castración y barrios con baja demanda institucional.",
@@ -1217,7 +1305,7 @@ with tabs[10]:
 
 
 # ── 12. Tabla ───────────────────────────────────────────────────────────────
-with tabs[11]:
+with tabs[13]:
     _section_header(
         "Datos filtrados",
         "Tabla detallada con búsqueda y descarga.",
