@@ -480,11 +480,12 @@ st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Tabs ────────────────────────────────────────────────────────────────────
 tab_names = [
-    "📖 Cómo leer", "📊 Resumen", "✂️ Castración", "🗺️ Geografía",
+    "📊 Resumen", "✂️ Castración", "🗺️ Geografía",
     "⚠️ Barrios prioritarios", "🏛️ Municipio",
     "💊 Cuidado · Acciones", "🧠 Cuidado · Conocimiento",
     "🐕 Callejeros", "📚 Brecha informativa",
     "🩺 Salud pública", "👨‍👩‍👧 Demografía", "🎯 Acción municipal", "📋 Tabla",
+    "📖 Cómo leer",
 ]
 tabs = st.tabs(tab_names)
 
@@ -512,7 +513,7 @@ def _label_bars_h(ax, vals, fmt="{:.0f}", offset_pct=0.015):
 
 
 # ── 0. Cómo leer ────────────────────────────────────────────────────────────
-with tabs[0]:
+with tabs[13]:
     _section_header(
         "Cómo leer este dashboard",
         "Guía rápida: qué mide cada pestaña, cómo interpretarla y advertencias clave.",
@@ -556,7 +557,7 @@ gráficos respetando los filtros aplicados, con una nota explicativa al pie de c
 
 
 # ── 1. Resumen ──────────────────────────────────────────────────────────────
-with tabs[1]:
+with tabs[0]:
     _section_header(
         "Vista general",
         "Composición del relevamiento: tipo de mascotas, viviendas y autopercepción.",
@@ -615,7 +616,7 @@ with tabs[1]:
 
 
 # ── 2. Castración ───────────────────────────────────────────────────────────
-with tabs[2]:
+with tabs[1]:
     _section_header(
         "Castración",
         "Dónde castran y cómo influye conocer que es gratuita.",
@@ -652,7 +653,7 @@ with tabs[2]:
 
 
 # ── 3. Geografía ────────────────────────────────────────────────────────────
-with tabs[3]:
+with tabs[2]:
     _section_header(
         "Geografía",
         "Cobertura por barrio y nivel de castración donde hay datos suficientes.",
@@ -689,7 +690,7 @@ with tabs[3]:
 
 
 # ── 4. Barrios prioritarios ─────────────────────────────────────────────────
-with tabs[4]:
+with tabs[3]:
     _section_header(
         "Barrios prioritarios",
         "Zonas donde concentrar campañas de castración.",
@@ -733,7 +734,7 @@ with tabs[4]:
 
 
 # ── 5. Municipio ────────────────────────────────────────────────────────────
-with tabs[5]:
+with tabs[4]:
     _section_header(
         "Demanda al municipio",
         "Pedidos de la comunidad y distribución por ciudad.",
@@ -819,7 +820,7 @@ with tabs[5]:
 
 
 # ── 6a. Cuidado · Acciones ─────────────────────────────────────────────────
-with tabs[6]:
+with tabs[5]:
     _section_header(
         "Cuidado · Acciones",
         "Qué hace efectivamente la gente: castrar, vacunar, desparasitar.",
@@ -874,7 +875,7 @@ with tabs[6]:
 
 
 # ── 6b. Cuidado · Conocimiento ─────────────────────────────────────────────
-with tabs[7]:
+with tabs[6]:
     _section_header(
         "Cuidado · Conocimiento",
         "Qué SABE la gente sobre castración gratuita y vacunación anual.",
@@ -913,7 +914,7 @@ with tabs[7]:
 
 
 # ── 7. Callejeros ───────────────────────────────────────────────────────────
-with tabs[8]:
+with tabs[7]:
     _section_header(
         "Animales en la calle",
         "Frecuencia observada, salidas sin supervisión e identificación.",
@@ -996,7 +997,7 @@ with tabs[8]:
 
 
 # ── 8. Brecha informativa ───────────────────────────────────────────────────
-with tabs[9]:
+with tabs[8]:
     _section_header(
         "Brecha informativa",
         "Distancia entre lo que la gente sabe y lo que efectivamente hace.",
@@ -1083,7 +1084,7 @@ with tabs[9]:
 
 
 # ── 9. Salud pública ────────────────────────────────────────────────────────
-with tabs[10]:
+with tabs[9]:
     _section_header(
         "Salud pública",
         "Cruces de vacunación y desparasitación: zonas de riesgo zoonótico.",
@@ -1153,7 +1154,7 @@ with tabs[10]:
 
 
 # ── 10. Demografía ──────────────────────────────────────────────────────────
-with tabs[11]:
+with tabs[10]:
     _section_header(
         "Demografía y composición",
         "Castración por tamaño familiar y densidad de mascotas.",
@@ -1239,7 +1240,7 @@ with tabs[11]:
 
 
 # ── 11. Acción municipal ────────────────────────────────────────────────────
-with tabs[12]:
+with tabs[11]:
     _section_header(
         "Acción municipal",
         "Efecto del municipio en la castración y barrios con baja demanda institucional.",
@@ -1305,7 +1306,7 @@ with tabs[12]:
 
 
 # ── 12. Tabla ───────────────────────────────────────────────────────────────
-with tabs[13]:
+with tabs[12]:
     _section_header(
         "Datos filtrados",
         "Tabla detallada con búsqueda y descarga.",
