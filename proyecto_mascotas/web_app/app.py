@@ -1413,53 +1413,48 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
         # ── CÓMO LEER ESTE REPORTE (página de guía) ────────────────
         fig, ax = plt.subplots(figsize=(11, 8.5))
         ax.axis("off")
-        ax.text(0.06, 0.95, "📖 Cómo leer este reporte",
+        ax.text(0.06, 0.95, "Cómo leer este reporte",
                 fontsize=20, fontweight="bold", color=NAVY,
                 ha="left", va="top")
-        ax.text(0.06, 0.88,
+        ax.text(0.06, 0.905,
                 "Antes de interpretar los gráficos, tené en cuenta lo siguiente:",
-                fontsize=11, color=NAVY, ha="left", va="top")
+                fontsize=10.5, color=NAVY, ha="left", va="top")
 
         bloques = [
-            ("⚠️ Unidad de medida",
-             "Cada fila del dataset = 1 HOGAR encuestado, NO 1 mascota. "
-             "Cuando un gráfico dice '% castradas', se refiere al % de hogares que "
-             "declaran tener su mascota castrada. Un hogar puede tener varias mascotas."),
-            ("🧭 Recorrido sugerido",
-             "1) Resumen → composición general\n"
-             "2) Cuidado → indicadores de acciones (castrar/vacunar/desparasitar) "
-             "y conocimiento (separados)\n"
-             "3) Castración + Brecha informativa → ¿saber implica actuar?\n"
-             "4) Geografía + Barrios prioritarios → dónde focalizar\n"
-             "5) Municipio + Acción municipal → demanda institucional\n"
-             "6) Salud pública + Callejeros + Demografía → riesgo zoonótico y composición"),
-            ("🎨 Códigos de color",
-             "Verde = acción / cobertura completa. Amarillo = parcial / advertencia. "
-             "Rojo = falta / riesgo. Azul / Teal = volumen. Violeta = conocimiento."),
-            ("📐 Limitaciones del dato",
-             "• Algunos hogares no informaron cantidad exacta de mascotas por sexo "
-             "(254 nulos en perros macho, 364 en gatos macho de 507 filas) — por eso "
-             "no se puede inferir con certeza el total de animales individuales.\n"
-             "• Barrios con <3 encuestas se filtran en varios gráficos para evitar ruido.\n"
-             "• Las preguntas multi-respuesta (pedidos al municipio, cómo viven) "
-             "permiten que un hogar marque varias opciones — los % NO suman 100."),
-            ("🔧 Corrección importante en 'Cuidado'",
-             "Los indicadores de CONOCIMIENTO (sabe sobre castración gratis / vacunas "
-             "anuales) se muestran en una página APARTE de las ACCIONES (castrar, vacunar, "
-             "desparasitar). Mezclarlos en una misma barra no tiene sentido semántico: "
-             "saber no es actuar, y la diferencia entre ambos es justamente la 'brecha "
-             "informativa' que el municipio debería atacar."),
+            ("1) Unidad de medida",
+             ["Cada fila del dataset = 1 HOGAR encuestado, NO 1 mascota.",
+              "Cuando un gráfico dice '% castradas', se refiere al % de hogares que",
+              "declaran tener su mascota castrada. Un hogar puede tener varias mascotas."]),
+            ("2) Recorrido sugerido",
+             ["a) Resumen -> composición general",
+              "b) Cuidado -> acciones (castrar/vacunar/desparasitar) y conocimiento (separados)",
+              "c) Castración + Brecha informativa -> ¿saber implica actuar?",
+              "d) Geografía + Barrios prioritarios -> dónde focalizar",
+              "e) Municipio + Acción municipal -> demanda institucional",
+              "f) Salud pública + Callejeros + Demografía -> riesgo zoonótico y composición"]),
+            ("3) Códigos de color",
+             ["Verde = acción / cobertura completa.   Amarillo = parcial / advertencia.",
+              "Rojo = falta / riesgo.   Azul / Teal = volumen.   Violeta = conocimiento."]),
+            ("4) Limitaciones del dato",
+             ["- Algunos hogares no informaron cantidad exacta de mascotas por sexo",
+              "  (254 nulos en perros macho, 364 en gatos macho de 507 filas).",
+              "- Barrios con <3 encuestas se filtran en varios gráficos para evitar ruido.",
+              "- Las preguntas multi-respuesta permiten varias opciones: los % NO suman 100."]),
+            ("5) Corrección importante en 'Cuidado'",
+             ["Los indicadores de CONOCIMIENTO (sabe castración gratis / vacunas anuales) van",
+              "en una página APARTE de las ACCIONES (castrar/vacunar/desparasitar). Saber no",
+              "es actuar: la diferencia es la 'brecha informativa' que el municipio debe atacar."]),
         ]
-        y = 0.78
-        for titulo, cuerpo in bloques:
-            ax.text(0.06, y, titulo, fontsize=12, fontweight="bold",
+        y = 0.85
+        for titulo, lineas in bloques:
+            ax.text(0.06, y, titulo, fontsize=11.5, fontweight="bold",
                     color=ACCENT, ha="left", va="top")
-            y -= 0.035
-            for linea in textwrap.wrap(cuerpo, width=110):
-                ax.text(0.08, y, linea, fontsize=9.5, color=NAVY,
+            y -= 0.028
+            for linea in lineas:
+                ax.text(0.08, y, linea, fontsize=9, color=NAVY,
                         ha="left", va="top")
                 y -= 0.022
-            y -= 0.012
+            y -= 0.010
         pdf.savefig(fig); plt.close(fig)
 
         # ───── helpers locales para reusar lógica de las pestañas ────
