@@ -482,7 +482,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 tab_names = [
     "📊 Resumen", "✂️ Castración", "🗺️ Geografía",
     "⚠️ Barrios prioritarios", "🏛️ Municipio",
-    "💊 Cuidado · Acciones", "🧠 Cuidado · Conocimiento",
+    "💊 Cuidado · Acciones",
     "🐕 Callejeros", "📚 Brecha informativa",
     "🩺 Salud pública", "👨‍👩‍👧 Demografía", "🎯 Acción municipal", "📋 Tabla",
     "📖 Cómo leer",
@@ -513,7 +513,7 @@ def _label_bars_h(ax, vals, fmt="{:.0f}", offset_pct=0.015):
 
 
 # ── 0. Cómo leer ────────────────────────────────────────────────────────────
-with tabs[13]:
+with tabs[12]:
     _section_header(
         "Cómo leer este dashboard",
         "Guía rápida: qué mide cada pestaña, cómo interpretarla y advertencias clave.",
@@ -541,14 +541,6 @@ hogares que respondieron declaran tener a sus mascotas castradas.
 - Solo se muestran barrios con **≥3 encuestas** para evitar lecturas inestables.
 - Las respuestas son **autodeclaradas**: pueden estar sesgadas por deseabilidad social.
 - Los filtros del panel lateral afectan **todas** las pestañas simultáneamente.
-
-**⚠️ Corrección importante — Cuidado.**
-La sección Cuidado se separó en dos pestañas porque mezclar acciones y conocimiento
-inducía a error:
-- **Cuidado · Acciones** → % de hogares que efectivamente **castran, vacunan o desparasitan**.
-- **Cuidado · Conocimiento** → % de hogares que **saben** sobre castración gratuita o
-  vacunación anual. **Saber no implica actuar** — comparar ambas pestañas mide la
-  brecha información → acción.
 
 **Reporte PDF.** El botón "Generar PDF" en la última pestaña exporta todos los
 gráficos respetando los filtros aplicados, con una nota explicativa al pie de cada página.
@@ -895,47 +887,8 @@ with tabs[5]:
     _render_fig(fig, "cuidado_acciones")
 
 
-# ── 6b. Cuidado · Conocimiento ─────────────────────────────────────────────
-with tabs[6]:
-    _section_header(
-        "Cuidado · Conocimiento",
-        "Qué SABE la gente sobre castración gratuita y vacunación anual.",
-    )
-    st.caption(
-        "CONOCIMIENTO = % de hogares que SABEN sobre el servicio. Saber no implica "
-        "actuar — la comparación con la pestaña de Acciones mide la brecha "
-        "información → práctica."
-    )
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5.5))
-    ax1, ax2 = axes
-    con_cols = ["Sabe_Castracion_Gratuita", "Sabe_Vacunas_Anuales"]
-    con_nombres = ["Sabe Cast.\nGratis", "Sabe Vac.\nAnuales"]
-    pares = [(n, _pct_si(df[c])) for n, c in zip(con_nombres, con_cols) if c in df.columns]
-    if pares:
-        labels = [p[0] for p in pares]
-        vals = [p[1] for p in pares]
-        ax1.bar(labels, vals, color=[ACCENT, ACCENT][:len(pares)], edgecolor="white")
-        ax1.set_title("Conocimiento de servicios (%)")
-        ax1.set_ylim(0, 110)
-        _label_bars_v(ax1, vals, fmt="{:.1f}%")
-
-    if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
-        sub = df.copy()
-        sub["sabe_b"] = (sub["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si")
-        sub["cast_b"] = (sub["Mascota_Castrada"].astype(str).str.lower() == "si").astype(int) * 100
-        gg = sub.groupby("sabe_b")["cast_b"].mean()
-        etiquetas = ["No sabe que es gratuita", "Sabe que es gratuita"]
-        vals2 = [gg.get(False, 0), gg.get(True, 0)]
-        ax2.bar(etiquetas, vals2, color=[RED, GREEN], edgecolor="white")
-        ax2.set_title("% Castración según conocimiento\nde castración gratuita")
-        ax2.set_ylim(0, 110)
-        ax2.set_ylabel("% Castradas")
-        _label_bars_v(ax2, vals2, fmt="{:.1f}%")
-    _render_fig(fig, "cuidado_conocimiento")
-
-
 # ── 7. Callejeros ───────────────────────────────────────────────────────────
-with tabs[7]:
+with tabs[6]:
     _section_header(
         "Animales en la calle",
         "Frecuencia observada, salidas sin supervisión e identificación.",
@@ -1018,7 +971,7 @@ with tabs[7]:
 
 
 # ── 8. Brecha informativa ───────────────────────────────────────────────────
-with tabs[8]:
+with tabs[7]:
     _section_header(
         "Brecha informativa",
         "Distancia entre lo que la gente sabe y lo que efectivamente hace.",
@@ -1105,7 +1058,7 @@ with tabs[8]:
 
 
 # ── 9. Salud pública ────────────────────────────────────────────────────────
-with tabs[9]:
+with tabs[8]:
     _section_header(
         "Salud pública",
         "Cruces de vacunación y desparasitación: zonas de riesgo zoonótico.",
@@ -1175,7 +1128,7 @@ with tabs[9]:
 
 
 # ── 10. Demografía ──────────────────────────────────────────────────────────
-with tabs[10]:
+with tabs[9]:
     _section_header(
         "Demografía y composición",
         "Castración por tamaño familiar y densidad de mascotas.",
@@ -1241,7 +1194,7 @@ with tabs[10]:
 
 
 # ── 11. Acción municipal ────────────────────────────────────────────────────
-with tabs[11]:
+with tabs[10]:
     _section_header(
         "Acción municipal",
         "Efecto del municipio en la castración y barrios con baja demanda institucional.",
@@ -1307,7 +1260,7 @@ with tabs[11]:
 
 
 # ── 12. Tabla ───────────────────────────────────────────────────────────────
-with tabs[12]:
+with tabs[11]:
     _section_header(
         "Datos filtrados",
         "Tabla detallada con búsqueda y descarga.",
@@ -1341,15 +1294,13 @@ PDF_NOTAS = {
     "barrios_prio": "Cantidad estimada de animales sin castrar = suma del total de mascotas de hogares no castrados del barrio. "
                     "Entre paréntesis: % de hogares del barrio sin castrar.",
     "municipio": "% = hogares que marcaron esa opción. Los pedidos al municipio son multi-respuesta (un hogar puede pedir varias cosas).",
-    "cuidado_acc": "ACCIONES de cuidado: % de hogares que efectivamente CASTRAN, VACUNAN o DESPARASITAN. "
-                   "Estos indicadores se muestran APARTE del conocimiento (ver página siguiente) porque mezclar acción con conocimiento no tiene sentido semántico.",
-    "cuidado_con": "CONOCIMIENTO: % de hogares que SABEN sobre el servicio. Saber no implica actuar — la comparación entre páginas mide la brecha información→acción.",
+    "cuidado_acc": "ACCIONES de cuidado: % de hogares que efectivamente CASTRAN, VACUNAN o DESPARASITAN.",
     "callejeros": "Frecuencia callejeros = % de hogares de cada ciudad que reportan ver animales 'todo el tiempo / a veces / nunca'. "
                   "Salen solos e Identificador son indicadores de riesgo del hogar.",
     "brecha":    "Autopercepción vs práctica: compara cuántos hogares se DECLARAN responsables con cuántos efectivamente castran/vacunan/desparasitan. "
                  "Una brecha grande indica que la intención no se traduce en acción.",
     "salud":     "Matriz de riesgo: 4 cuadrantes mutuamente excluyentes (% suman 100). Brecha sanitaria: indicadores SOLAPADOS — 'Ninguna' está dentro de 'No vacuna' y 'No desparasita'.",
-    "demografia": "% castración por tamaño familiar y mascotas/integrante. El último panel cuenta ANIMALES sin castrar por sexo (no hogares).",
+    "demografia": "% castración por tamaño familiar y mascotas/integrante por tipo de vivienda. El panel de la derecha muestra hogares con ≥4 mascotas por barrio.",
     "accion_mun": "Compara comportamiento (castrar / saber del servicio gratuito) según pedidos al municipio. "
                   "Si las barras se parecen, la información no es la barrera principal para castrar.",
 }
@@ -1429,7 +1380,7 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
               "declaran tener su mascota castrada. Un hogar puede tener varias mascotas."]),
             ("2) Recorrido sugerido",
              ["a) Resumen -> composición general",
-              "b) Cuidado -> acciones (castrar/vacunar/desparasitar) y conocimiento (separados)",
+              "b) Cuidado -> acciones (castrar/vacunar/desparasitar)",
               "c) Castración + Brecha informativa -> ¿saber implica actuar?",
               "d) Geografía + Barrios prioritarios -> dónde focalizar",
               "e) Municipio + Acción municipal -> demanda institucional",
@@ -1734,37 +1685,6 @@ def construir_pdf(df: pd.DataFrame, filtros_info: str = "") -> bytes:
                     ax2.legend(loc="lower right", fontsize=8)
             return fig
         _add_page(_build_cuidado_acciones, "cuidado_acc")
-
-        def _build_cuidado_conocimiento():
-            fig, axes = plt.subplots(1, 2, figsize=(13, 5.5))
-            fig.suptitle("6b. Cuidado — CONOCIMIENTO de servicios",
-                         fontsize=14, fontweight="bold", color=NAVY)
-            ax1, ax2 = axes
-            con_cols = ["Sabe_Castracion_Gratuita", "Sabe_Vacunas_Anuales"]
-            nombres = ["Sabe Cast.\nGratis", "Sabe Vac.\nAnuales"]
-            pares = [(n, _pct_si(df[c])) for n, c in zip(nombres, con_cols) if c in df.columns]
-            if pares:
-                labels = [p[0] for p in pares]
-                vals = [p[1] for p in pares]
-                ax1.bar(labels, vals, color=PURPLE, edgecolor="white")
-                ax1.set_title("% de hogares que SABE")
-                ax1.set_ylim(0, 110)
-                _label_bars_v(ax1, vals, fmt="{:.1f}%")
-            # ¿Saber se traduce en castrar? — comparación
-            if {"Sabe_Castracion_Gratuita", "Mascota_Castrada"} <= set(df.columns):
-                sabe_si = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "si"]
-                sabe_no = df[df["Sabe_Castracion_Gratuita"].astype(str).str.lower() == "no"]
-                p_si = _pct_si(sabe_si.get("Mascota_Castrada", pd.Series(dtype=str)))
-                p_no = _pct_si(sabe_no.get("Mascota_Castrada", pd.Series(dtype=str)))
-                labels = [f"Sabe (n={len(sabe_si)})", f"No sabe (n={len(sabe_no)})"]
-                vals = [p_si, p_no]
-                ax2.bar(labels, vals, color=[GREEN, RED], edgecolor="white")
-                ax2.set_title("¿Conocer el servicio se traduce\nen castrar?")
-                ax2.set_ylim(0, 110)
-                ax2.set_ylabel("% castradas")
-                _label_bars_v(ax2, vals, fmt="{:.0f}%")
-            return fig
-        _add_page(_build_cuidado_conocimiento, "cuidado_con")
 
         # ── PÁGINA: CALLEJEROS ─────────────────────────────────────
         def _build_callejeros():
