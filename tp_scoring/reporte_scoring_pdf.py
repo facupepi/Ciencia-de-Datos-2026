@@ -257,11 +257,53 @@ def portada(pdf, titulo, subtitulo=""):
 
 
 def pagina_titulo(pdf, titulo):
-    # El texto del reporte va al .docx, no al PDF.
+    # 1) Word
     if "_DOC" in globals() and _DOC is not None:
         h = _DOC.add_heading(titulo, level=1)
         for run in h.runs:
             run.font.color.rgb = RGBColor(0x2C, 0x3E, 0x50)
+    # 2) PDF — página de separación con título grande y banda decorativa
+    from matplotlib.patches import Rectangle
+    fig, ax = plt.subplots(figsize=(11, 8.5))
+    ax.axis("off")
+    ax.add_patch(Rectangle((0.0, 0.50), 1.0, 0.18,
+                           transform=ax.transAxes,
+                           facecolor="#2c3e50", edgecolor="none"))
+    ax.add_patch(Rectangle((0.0, 0.485), 1.0, 0.012,
+                           transform=ax.transAxes,
+                           facecolor="#3498db", edgecolor="none"))
+    # Tamaño de fuente adaptativo según largo del título (evita que se corte)
+    _n = len(titulo)
+    if _n <= 30:
+        _fs = 24
+    elif _n <= 45:
+        _fs = 20
+    elif _n <= 60:
+        _fs = 17
+    else:
+        _fs = 14
+    ax.text(0.5, 0.59, titulo, transform=ax.transAxes,
+            fontsize=_fs, fontweight="bold", ha="center", va="center",
+            color="white", wrap=True)
+    ax.text(0.5, 0.40, "TP Scoring Académico — Ciencia de Datos 2026",
+            transform=ax.transAxes, fontsize=11, ha="center", va="center",
+            color="#95a5a6", style="italic")
+    pdf.savefig(fig); plt.close()
+
+
+def _es_header_seccion(linea):
+    """Detecta líneas que actúan como encabezado: ALL CAPS cortas, sin viñetas."""
+    s = linea.strip()
+    if not s or len(s) > 60:
+        return False
+    if s.startswith(("•", "-", "→", "  ", "\t")):
+        return False
+    # Letras alfabéticas → mayoritariamente mayúsculas
+    letras = [c for c in s if c.isalpha()]
+    if not letras:
+        return False
+    upper_ratio = sum(1 for c in letras if c.isupper()) / len(letras)
+    return upper_ratio >= 0.85
 
 
 def render_tabla(pdf, data, col_labels, titulo, col_widths=None,
@@ -287,7 +329,7 @@ def render_tabla(pdf, data, col_labels, titulo, col_widths=None,
 
 
 def pagina_texto(pdf, titulo, lineas):
-    # El texto del reporte va al .docx, no al PDF.
+    # 1) Word
     if "_DOC" in globals() and _DOC is not None:
         h = _DOC.add_heading(titulo, level=2)
         for run in h.runs:
@@ -296,6 +338,235 @@ def pagina_texto(pdf, titulo, lineas):
             p = _DOC.add_paragraph(ln)
             for run in p.runs:
                 run.font.size = Pt(11)
+
+    # 2) PDF — paginación bonita y legible
+    from matplotlib.patches import Rectangle
+    from textwrap import wrap as _wrap
+
+    MAX_CHARS = 95           # ancho aproximado por línea
+    BULLET_INDENT = "   "    # sangría visual para continuación de bullets
+    Y_TOP = 0.86
+    Y_BOTTOM = 0.06
+    LINE_H = 0.028           # altura por línea de cuerpo
+    HEADER_H = 0.040         # altura para encabezados de sección ALL CAPS
+
+    # Expandir cada línea a líneas envueltas + estilo
+    items = []  # (texto, estilo)  estilo ∈ {"header","bullet","arrow","body","blank"}
+    for ln in lineas:
+        raw = ln.rstrip()
+        if not raw.strip():
+            items.append(("", "blank"))
+            continue
+        if _es_header_seccion(raw):
+            items.append((raw.strip(), "header"))
+            continue
+        stripped = raw.lstrip()
+        if stripped.startswith("•"):
+            estilo = "bullet"
+            cuerpo = stripped[1:].lstrip()
+            prefix = "•  "
+        elif stripped.startswith("→"):
+            estilo = "arrow"
+            cuerpo = stripped[1:].lstrip()
+            prefix = "→  "
+        elif stripped.startswith("- "):
+            estilo = "bullet"
+            cuerpo = stripped[2:]
+            prefix = "•  "
+        else:
+            estilo = "body"
+            cuerpo = stripped
+            prefix = ""
+        wrapped = _wrap(cuerpo, width=MAX_CHARS - len(prefix)) or [""]
+        for i, w in enumerate(wrapped):
+            items.append(((prefix if i == 0 else BULLET_INDENT) + w, estilo))
+
+    def _alturas(it):
+        return HEADER_H if it[1] == "header" else (LINE_H * 0.55 if it[1] == "blank" else LINE_H)
+
+    # Paginar
+    paginas = []
+    actual = []
+    usado = 0.0
+    capacidad = Y_TOP - Y_BOTTOM
+    for it in items:
+        h = _alturas(it)
+        if usado + h > capacidad and actual:
+            paginas.append(actual)
+            actual = [it]
+            usado = h
+        else:
+            actual.append(it)
+            usado += h
+    if actual:
+        paginas.append(actual)
+
+    total = len(paginas)
+    for idx, pag in enumerate(paginas, 1):
+        fig, ax = plt.subplots(figsize=(11, 8.5))
+        ax.axis("off")
+
+        # Banda superior con el título de sección
+        ax.add_patch(Rectangle((0.0, 0.92), 1.0, 0.06,
+                               transform=ax.transAxes,
+                               facecolor="#34495e", edgecolor="none"))
+        ax.add_patch(Rectangle((0.0, 0.913), 1.0, 0.008,
+                               transform=ax.transAxes,
+                               facecolor="#3498db", edgecolor="none"))
+        sufijo = f"   ({idx}/{total})" if total > 1 else ""
+        _titpag = titulo + sufijo
+        _fs_pag = 14 if len(_titpag) <= 55 else (12 if len(_titpag) <= 75 else 10)
+        ax.text(0.04, 0.95, _titpag, transform=ax.transAxes,
+                fontsize=_fs_pag, fontweight="bold", color="white", va="center")
+
+        # Cuerpo
+        y = Y_TOP
+        for texto, estilo in pag:
+            if estilo == "blank":
+                y -= LINE_H * 0.55
+                continue
+            if estilo == "header":
+                ax.add_patch(Rectangle((0.04, y - HEADER_H + 0.006),
+                                       0.005, HEADER_H - 0.008,
+                                       transform=ax.transAxes,
+                                       facecolor="#2980b9", edgecolor="none"))
+                ax.text(0.055, y - HEADER_H / 2, texto,
+                        transform=ax.transAxes, fontsize=12,
+                        fontweight="bold", color="#2980b9", va="center")
+                y -= HEADER_H
+                continue
+            if estilo == "bullet":
+                color = "#2c3e50"
+            elif estilo == "arrow":
+                color = "#16a085"
+            else:
+                color = "#2c3e50"
+            ax.text(0.06, y - LINE_H / 2, texto,
+                    transform=ax.transAxes, fontsize=10.5,
+                    color=color, va="center", family="DejaVu Sans")
+            y -= LINE_H
+
+        # Pie sutil
+        ax.text(0.96, 0.03, f"{idx}/{total}" if total > 1 else "",
+                transform=ax.transAxes, fontsize=8,
+                color="#95a5a6", ha="right", va="center")
+
+        pdf.savefig(fig); plt.close()
+
+
+def pagina_qa(pdf, titulo, qa_list):
+    """Renderiza una lista de (pregunta, respuesta) tanto en Word como en PDF
+    con un layout legible: pregunta en azul + respuesta en gris, separador sutil
+    y paginación automática."""
+    from matplotlib.patches import Rectangle
+    from textwrap import wrap as _wrap
+
+    # ── 1) Word ───────────────────────────────────────────────────────────
+    if "_DOC" in globals() and _DOC is not None:
+        for preg, resp in qa_list:
+            p_q = _DOC.add_paragraph()
+            run_q = p_q.add_run("Pregunta: ")
+            run_q.bold = True
+            p_q.add_run(preg)
+            p_a = _DOC.add_paragraph()
+            run_a = p_a.add_run("Respuesta: ")
+            run_a.bold = True
+            p_a.add_run(resp)
+            _DOC.add_paragraph()
+
+    # ── 2) PDF ────────────────────────────────────────────────────────────
+    MAX_CHARS_Q = 92
+    MAX_CHARS_A = 96
+    Y_TOP = 0.86
+    Y_BOTTOM = 0.06
+    LINE_Q = 0.030
+    LINE_A = 0.027
+    GAP_QA = 0.015           # entre pregunta y respuesta
+    GAP_BLOCK = 0.030        # entre un par y el siguiente
+
+    # Construir bloques: cada bloque = ((preg_lines), (resp_lines), n)
+    bloques = []
+    for n, (preg, resp) in enumerate(qa_list, 1):
+        ql = _wrap(preg, width=MAX_CHARS_Q) or [""]
+        rl = _wrap(resp, width=MAX_CHARS_A) or [""]
+        bloques.append((ql, rl, n))
+
+    def alto_bloque(b):
+        ql, rl, _ = b
+        return len(ql) * LINE_Q + GAP_QA + len(rl) * LINE_A + GAP_BLOCK
+
+    # Paginar
+    paginas = []
+    actual = []
+    usado = 0.0
+    capacidad = Y_TOP - Y_BOTTOM
+    for b in bloques:
+        h = alto_bloque(b)
+        # Si el bloque solo no entra en una página completa, lo metemos igual y
+        # luego cae fuera del área (raro: una respuesta de >25 líneas).
+        if usado + h > capacidad and actual:
+            paginas.append(actual)
+            actual = [b]
+            usado = h
+        else:
+            actual.append(b)
+            usado += h
+    if actual:
+        paginas.append(actual)
+
+    total = len(paginas)
+    for idx, pag in enumerate(paginas, 1):
+        fig, ax = plt.subplots(figsize=(11, 8.5))
+        ax.axis("off")
+
+        # Banda superior
+        ax.add_patch(Rectangle((0.0, 0.92), 1.0, 0.06,
+                               transform=ax.transAxes,
+                               facecolor="#34495e", edgecolor="none"))
+        ax.add_patch(Rectangle((0.0, 0.913), 1.0, 0.008,
+                               transform=ax.transAxes,
+                               facecolor="#3498db", edgecolor="none"))
+        sufijo = f"   ({idx}/{total})" if total > 1 else ""
+        _titpag = titulo + sufijo
+        _fs_pag = 14 if len(_titpag) <= 55 else (12 if len(_titpag) <= 75 else 10)
+        ax.text(0.04, 0.95, _titpag, transform=ax.transAxes,
+                fontsize=_fs_pag, fontweight="bold", color="white", va="center")
+
+        y = Y_TOP
+        for ql, rl, num in pag:
+            # Etiqueta "Pregunta N"
+            ax.text(0.045, y - LINE_Q / 2, f"P{num}",
+                    transform=ax.transAxes, fontsize=10,
+                    color="#3498db", va="center",
+                    fontweight="bold", family="DejaVu Sans")
+            # Texto de pregunta (en azul oscuro, bold)
+            for i, line in enumerate(ql):
+                ax.text(0.095, y - LINE_Q / 2, line,
+                        transform=ax.transAxes, fontsize=11,
+                        color="#2c3e50", va="center",
+                        fontweight="bold", family="DejaVu Sans")
+                y -= LINE_Q
+            y -= GAP_QA
+            # Texto de respuesta (gris medio, sangrado)
+            for line in rl:
+                ax.text(0.095, y - LINE_A / 2, line,
+                        transform=ax.transAxes, fontsize=10.2,
+                        color="#34495e", va="center",
+                        family="DejaVu Sans")
+                y -= LINE_A
+            y -= GAP_BLOCK
+            # Línea divisoria sutil
+            ax.add_patch(Rectangle((0.045, y + GAP_BLOCK * 0.45),
+                                   0.91, 0.0008,
+                                   transform=ax.transAxes,
+                                   facecolor="#dfe4ea", edgecolor="none"))
+
+        # Pie
+        ax.text(0.96, 0.03, f"{idx}/{total}" if total > 1 else "",
+                transform=ax.transAxes, fontsize=8,
+                color="#95a5a6", ha="right", va="center")
+
+        pdf.savefig(fig); plt.close()
 
 
 def pagina_detalle_score(pdf, num, total, codigo, descripcion,
@@ -417,134 +688,204 @@ with PdfPages(_pdf_out) as pdf:
 
     _actividades_qa = [
         ("1. Definir el problema de negocio o académico que se quiere apoyar con un score.",
-         "Detectar en forma temprana a estudiantes con riesgo de bajo desempeño académico "
-         "para activar tutorías ANTES del examen final. No se busca predecir la nota: "
-         "se busca priorizar la intervención."),
+         "Detectar de forma temprana a los estudiantes con riesgo de bajo desempeño "
+         "académico para activar tutorías y refuerzos ANTES del examen final. "
+         "El objetivo no es predecir la nota exacta, sino priorizar a quién intervenir primero."),
         ("2. Identificar la unidad de análisis (cliente, estudiante, transacción, etc.).",
-         "El estudiante (una fila = un alumno por cursada). El score se calcula por alumno, "
-         "no por examen ni por materia."),
+         "La unidad de análisis es el estudiante: una fila del dataset equivale a un alumno "
+         "por cursada. El score se calcula por alumno (no por examen ni por materia)."),
         ("3. Determinar qué significa el score (ej. probabilidad de fraude, riesgo de abandono, "
          "propensión a comprar).",
-         "Probabilidad/propensión de tener BAJO DESEMPEÑO académico (exam_score < 60). "
-         "Valor entre 0 y 100: a mayor score, mayor riesgo estimado. El score es ordinal, "
-         "no una nota."),
+         "El score representa la probabilidad estimada de tener bajo desempeño académico "
+         "(exam_score < 60). Toma valores entre 0 y 100: a mayor score, mayor riesgo. "
+         "Es una escala ordinal de priorización, no una predicción de la nota."),
         ("4. Explorar el dataset propuesto: estadísticas descriptivas, valores faltantes, "
          "correlaciones.",
-         "Dataset de 200 alumnos, sin nulos. Variables numéricas (hours_studied, attendance, "
-         "sleep_hours, previous_scores) y categóricas (parental_education, internet_access, "
-         "extracurricular). Correlaciones con exam_score: hours_studied r=0.78, attendance "
-         "r=0.65, previous_scores r=0.58, sleep_hours r=0.21. Clase positiva ~25 %."),
+         "Dataset de 200 alumnos, sin valores nulos. Variables numéricas: hours_studied, "
+         "attendance, sleep_hours y previous_scores; categóricas: parental_education, "
+         "internet_access y extracurricular. Correlaciones con exam_score: hours_studied "
+         "r = 0,78, attendance r = 0,65, previous_scores r = 0,58 y sleep_hours r = 0,21. "
+         "La clase positiva (riesgo) representa aproximadamente el 25 % de los casos."),
         ("5. Limpiar y transformar los datos (codificación, normalización si corresponde).",
-         "No hubo imputaciones (no había NaN). Para el modelo: StandardScaler sobre las "
-         "numéricas, split 70/30 estratificado, random_state=42. Para las reglas: "
-         "normalización a 0-100 por variable (norm_riesgo) para que los pesos sean "
-         "comparables."),
+         "No hubo imputaciones porque el dataset no presentaba valores faltantes. "
+         "Para el modelo se aplicó StandardScaler a las variables numéricas y se hizo "
+         "un split 70/30 estratificado con random_state = 42. Para el score por reglas "
+         "se normalizó cada variable a una escala 0-100 (norm_riesgo) para que los pesos "
+         "fueran comparables entre sí."),
         ("6. Construir variables derivadas que aporten información al score.",
-         "norm_riesgo de hours_studied, attendance, previous_scores y sleep_hours "
-         "(invertidas: menos = más riesgo) llevadas a escala 0-100. score_reglas: "
-         "combinación lineal con pesos 40/30/20/10. nivel_riesgo: categorización del score "
-         "en 4 tramos. score_modelo: probabilidad predicha por Regresión Logística."),
+         "Se construyó norm_riesgo para hours_studied, attendance, previous_scores y "
+         "sleep_hours (invertidas: menor valor = mayor riesgo), llevadas a escala 0-100. "
+         "A partir de ellas se calculó score_reglas (combinación lineal con pesos 40/30/20/10), "
+         "nivel_riesgo (categorización del score en 4 tramos) y score_modelo (probabilidad "
+         "predicha por la Regresión Logística)."),
         ("7. Diseñar un scoring basado en reglas o pesos (combinación lineal o reglas if-then).",
-         "score = 0.40·riesgo_horas + 0.30·riesgo_asistencia + 0.20·riesgo_notas_previas "
-         "+ 0.10·riesgo_sueño. Los pesos replican el orden de las correlaciones observadas "
-         "en el EDA."),
+         "score = 0,40 · riesgo_horas + 0,30 · riesgo_asistencia + 0,20 · riesgo_notas_previas "
+         "+ 0,10 · riesgo_sueño. Los pesos respetan el orden de las correlaciones observadas "
+         "en el EDA, lo que asegura coherencia entre evidencia empírica y criterio experto."),
         ("8. Definir niveles de score (bajo / medio / alto / crítico) y su interpretación.",
-         "BAJO (0-30): sin alerta, seguimiento habitual. MEDIO (30-50): atención del "
-         "docente, monitoreo. ALTO (50-70): tutoría recomendada. CRÍTICO (70-100): "
-         "intervención inmediata del coordinador. Umbrales validados empíricamente."),
+         "Se definieron 4 tramos: BAJO (0-30) sin alerta, seguimiento habitual; "
+         "MEDIO (30-50) atención del docente y monitoreo; ALTO (50-70) tutoría recomendada; "
+         "CRÍTICO (70-100) intervención inmediata del coordinador. "
+         "Los umbrales fueron validados empíricamente: la tasa real de bajo desempeño crece "
+         "monotónicamente al pasar de un nivel al siguiente."),
         ("9. Asociar acciones sugeridas a cada nivel (descuento, llamar al cliente, alertar "
          "al docente, recomendar tutoría).",
-         "Bajo: ninguna acción especial. Medio: recordatorios, recursos de estudio "
-         "adicionales. Alto: convocar a tutoría, contactar a la familia. Crítico: reunión "
-         "con coordinador + plan de recuperación."),
+         "Bajo: ninguna acción especial. Medio: recordatorios y material de estudio adicional. "
+         "Alto: convocar a tutoría y contactar a la familia. Crítico: reunión con el "
+         "coordinador académico y armado de un plan de recuperación con seguimiento semanal."),
         ("10. Implementar un modelo simple con scikit-learn (regresión logística o árbol de "
          "decisión) para estimar una probabilidad y compararla con el score de reglas.",
-         "Regresión Logística (interpretable, baseline) y Random Forest (compara desempeño "
-         "no lineal). Target binario: riesgo_bajo_desempeno = (exam_score < 60). "
-         "exam_score se EXCLUYE de las features para evitar data leakage."),
+         "Se entrenaron Regresión Logística (interpretable, baseline) y Random Forest "
+         "(captura relaciones no lineales) usando como target binario "
+         "riesgo_bajo_desempeno = (exam_score < 60). exam_score se excluye explícitamente "
+         "de las features para evitar data leakage."),
         ("11. Comparar el scoring por reglas y el scoring por modelo, analizando sus diferencias.",
-         "Ambos rankean a los alumnos de forma muy similar (correlación alta). El score "
-         "por reglas es totalmente transparente y auditable. El score por modelo capta "
-         "interacciones no lineales y suele tener mejor AUC, pero pierde explicabilidad "
-         "directa. Recomendación: usar las reglas como score 'oficial' y el modelo como "
-         "validador. Si ambos coinciden en CRÍTICO → alta confianza."),
+         "Ambos enfoques rankean a los alumnos de forma muy similar (correlación alta). "
+         "El score por reglas es totalmente transparente y auditable; el del modelo capta "
+         "interacciones no lineales y suele lograr mejor AUC, pero pierde explicabilidad "
+         "directa. Recomendación operativa: usar las reglas como score 'oficial' y el modelo "
+         "como validador. Si ambos coinciden en nivel CRÍTICO, se trata de una señal "
+         "de muy alta confianza."),
         ("12. Evaluar el modelo con métricas básicas: matriz de confusión, accuracy, "
          "precision, recall, F1, AUC.",
-         f"AUC-ROC LR ≈ {auc_lr:.3f} | AUC-ROC RF ≈ {auc_rf:.3f}. Recall priorizado "
-         "(no perder alumnos en riesgo real). Accuracy NO es buena métrica (clase "
-         "desbalanceada ~25 %). Matriz de confusión, precision y F1 también reportadas."),
+         f"AUC-ROC: LR ≈ {auc_lr:.3f} | RF ≈ {auc_rf:.3f}. Se priorizó el RECALL para no "
+         "perder alumnos en riesgo real. Accuracy NO es una buena métrica aquí porque la "
+         "clase está desbalanceada (~25 %). También se reportan matriz de confusión, "
+         "precision y F1 para tener una visión completa."),
         ("13. Reflexionar sobre los falsos positivos y falsos negativos en el contexto elegido.",
-         "FN (decir 'sin riesgo' y desaprobar): MUY GRAVE — alumno sin ayuda. FP (decir "
-         "'riesgo' y aprobar): leve — una tutoría 'de más'. Por eso el umbral se elige "
-         "para MAXIMIZAR RECALL aceptando algo más de FP. El costo asimétrico justifica "
-         "priorizar sensibilidad."),
+         "Falso Negativo (decir 'sin riesgo' y que el alumno desapruebe): consecuencia GRAVE, "
+         "el estudiante queda sin ayuda. Falso Positivo (decir 'riesgo' y que el alumno "
+         "apruebe): consecuencia leve, una tutoría 'de más'. Por eso el umbral se elige "
+         "para MAXIMIZAR el recall, aceptando algo más de FP. El costo asimétrico justifica "
+         "priorizar la sensibilidad por sobre la precisión."),
         ("14. Visualizar la distribución de los scores y los niveles obtenidos.",
-         "Visualizaciones incluidas en el PDF: histograma de score_reglas y score_modelo, "
-         "distribución por nivel de riesgo (bajo/medio/alto/crítico), curva ROC, matriz de "
-         "confusión y scatter reglas vs modelo."),
+         "El PDF incluye: histograma de score_reglas y score_modelo, distribución por "
+         "nivel de riesgo (bajo/medio/alto/crítico), curva ROC, matriz de confusión y "
+         "scatter de comparación reglas vs modelo."),
         ("15. Presentar conclusiones, limitaciones y propuestas de mejora.",
-         "Conclusión: ambos enfoques son consistentes y útiles como alerta temprana antes "
-         "del examen final. Limitaciones: n=200, una sola cohorte, variables autodeclaradas. "
-         "Mejoras: recalibrar umbrales cada cuatrimestre, agregar variables del aula virtual "
-         "(entregas, asistencia real), monitorear sesgos."),
+         "Conclusión: ambos enfoques son consistentes entre sí y útiles como alerta temprana "
+         "antes del examen final. Limitaciones: n = 200, una sola cohorte y variables "
+         "autodeclaradas. Mejoras propuestas: recalibrar los umbrales cada cuatrimestre, "
+         "incorporar variables del aula virtual (entregas, asistencia real) y monitorear "
+         "sesgos periódicamente."),
     ]
-    for _preg, _resp in _actividades_qa:
-        p_q = _DOC.add_paragraph()
-        run_q = p_q.add_run("Pregunta: ")
-        run_q.bold = True
-        p_q.add_run(_preg)
-        p_a = _DOC.add_paragraph()
-        run_a = p_a.add_run("Respuesta: ")
-        run_a.bold = True
-        p_a.add_run(_resp)
-        _DOC.add_paragraph()
+    pagina_qa(pdf, "Actividades — preguntas y respuestas", _actividades_qa)
 
     pagina_titulo(pdf, "Preguntas orientadoras para profundizar")
 
     _preguntas_orientadoras_qa = [
         ("¿Qué decisión concreta se busca apoyar con el score?",
-         "Identificar, antes del examen final, qué estudiantes tienen mayor riesgo de bajo desempeño para activar intervenciones de la cátedra: tutorías, material de refuerzo, seguimiento personalizado y, en casos críticos, tutoría obligatoria con seguimiento semanal."),
+         "Identificar, antes del examen final, qué estudiantes presentan mayor riesgo de "
+         "bajo desempeño, de forma que la cátedra pueda activar a tiempo intervenciones "
+         "concretas: tutorías, material de refuerzo, seguimiento personalizado y, en los "
+         "casos más críticos, tutoría obligatoria con monitoreo semanal."),
         ("¿Quién lo utilizará y en qué momento?",
-         "Tutores, coordinador académico y docente del curso. Se aplica al inicio o a mitad del cuatrimestre, ANTES del examen final — por eso exam_score no se usa como variable predictora (sería data leakage: se predeciría una decisión usando información que aún no se conoce)."),
+         "Lo utilizan los tutores, el coordinador académico y el docente del curso. "
+         "Se aplica al inicio o a mitad del cuatrimestre, siempre ANTES del examen final. "
+         "Por eso exam_score no se incluye como variable predictora: sería data leakage, "
+         "porque se estaría prediciendo una decisión usando información que en la práctica "
+         "todavía no se conoce."),
         ("¿Cuál es la diferencia entre scoring, clasificación y predicción?",
-         "Predicción: estima el VALOR de una variable continua (ej. la nota exacta en el examen). Es regresión. Clasificación: asigna una ETIQUETA discreta (ej. desaprueba sí/no); su salida es binaria o multiclase, no permite priorizar dentro de cada clase. Scoring: ORDENA a los individuos en una escala continua (0-100) para priorizar acciones; permite elegir el umbral según la capacidad operativa (cuántas tutorías hay disponibles)."),
+         "Predicción: estima el VALOR de una variable continua (por ejemplo, la nota "
+         "exacta del examen); es un problema de regresión. Clasificación: asigna una "
+         "ETIQUETA discreta (aprueba sí/no); su salida es binaria o multiclase y no "
+         "permite ordenar a los individuos dentro de cada clase. Scoring: ORDENA a los "
+         "individuos en una escala continua (0-100) para priorizar acciones, y permite "
+         "elegir el umbral según la capacidad operativa disponible (por ejemplo, cuántas "
+         "tutorías hay)."),
         ("¿Qué variables son más relevantes y por qué?",
-         "Según el EDA, hours_studied es la más fuerte (r = 0.78 con exam_score), seguida de previous_scores (r = 0.43), attendance_percent (r = 0.23) y sleep_hours (r = 0.19). Las dos primeras concentran ~70 % del poder predictivo; las dos restantes se incluyen porque tienen sustento teórico (compromiso y descanso afectan rendimiento) aunque correlacionen menos."),
+         "Según el EDA, hours_studied es la más fuerte (r = 0,78 con exam_score), "
+         "seguida por previous_scores (r = 0,43), attendance_percent (r = 0,23) y "
+         "sleep_hours (r = 0,19). Las dos primeras concentran cerca del 70 % del poder "
+         "predictivo; las dos restantes se mantienen porque tienen sustento teórico "
+         "(compromiso y descanso impactan en el rendimiento), aunque su correlación "
+         "lineal sea menor."),
         ("¿Cómo se justifican los pesos asignados?",
-         "Los pesos (40 / 30 / 20 / 10 %) replican el ORDEN de correlación con exam_score y respetan que la suma sea 100 %. No vienen de un ajuste automático sino de criterio experto + evidencia del EDA. Esto los hace auditables y explicables ante un usuario no técnico."),
+         "Los pesos (40 / 30 / 20 / 10 %) respetan el ORDEN de correlación con "
+         "exam_score y suman 100 %. No surgen de un ajuste automático sino de criterio "
+         "experto apoyado en la evidencia del EDA, lo que los hace auditables y "
+         "explicables ante un usuario no técnico."),
         ("¿Qué pasa si una variable está en una escala distinta a las demás?",
-         "Hay que NORMALIZAR antes de combinar. En el score por reglas se usa norm_riesgo(valor, bueno, malo) que mapea cada variable a [0, 100] con rangos definidos por dominio. En el modelo, StandardScaler estandariza (media 0, std 1) para que LogisticRegression no penalice variables con mayor varianza nominal."),
+         "Hay que NORMALIZAR antes de combinar variables. En el score por reglas se usa "
+         "norm_riesgo(valor, bueno, malo), que mapea cada variable a una escala [0, 100] "
+         "con rangos definidos por dominio. En el modelo se aplica StandardScaler "
+         "(media 0, desvío 1) para evitar que LogisticRegression penalice variables "
+         "solo por tener mayor varianza nominal."),
         ("¿Cómo se eligen los umbrales o niveles de score?",
-         "Se usaron cortes en 30 / 50 / 70 que dividen la escala en cuatro niveles operativos (Bajo / Medio / Alto / Crítico) y se VALIDARON empíricamente: la tasa real de bajo desempeño debe crecer monotónicamente de Bajo a Crítico, lo que se cumple. En otra cohorte habría que recalibrarlos."),
+         "Se eligieron cortes en 30 / 50 / 70 que dividen la escala en cuatro niveles "
+         "operativos (Bajo / Medio / Alto / Crítico) y se VALIDARON empíricamente: la "
+         "tasa real de bajo desempeño debe crecer monotónicamente al pasar de Bajo a "
+         "Crítico — y así ocurre. Frente a otra cohorte, los umbrales deberían "
+         "recalibrarse."),
         ("¿Qué tipo de problema es: clasificación binaria, multiclase, regresión?",
-         "CLASIFICACIÓN BINARIA: predice riesgo_bajo_desempeno ∈ {0, 1}. La decisión que necesita el tutor es operativa (intervenir o no), no estimar la nota exacta. Aunque internamente se trabaje con la probabilidad continua P(riesgo), eso es para SCORING, no para regresión sobre exam_score."),
+         "Es una CLASIFICACIÓN BINARIA: se predice riesgo_bajo_desempeno ∈ {0, 1}. "
+         "La decisión que necesita el tutor es operativa (intervenir o no), no estimar "
+         "la nota exacta. Aunque internamente se trabaje con la probabilidad continua "
+         "P(riesgo), esa probabilidad se usa para SCORING, no para hacer regresión sobre "
+         "exam_score."),
         ("¿Por qué se eligió ese algoritmo (regresión logística, árbol, random forest, etc.)?",
-         f"Se compararon dos modelos con validación cruzada (5 folds, AUC). Logistic Regression: lineal, INTERPRETABLE (coeficientes leíbles), rápido, sirve como baseline robusto. Random Forest: capta no-linealidades e interacciones, más robusto a outliers, no requiere escalado. Se eligió el de mejor AUC en CV. En contextos académicos con n pequeño y necesidad de explicabilidad, LR suele ganar — fue el caso (AUC = {auc_lr:.3f} vs {auc_rf:.3f})."),
+         f"Se compararon dos modelos con validación cruzada (5 folds, AUC). Logistic "
+         "Regression es lineal, INTERPRETABLE (coeficientes legibles), rápida y sirve "
+         "como baseline robusto. Random Forest capta no linealidades e interacciones, "
+         "es más robusto a outliers y no requiere escalado. Se eligió el de mejor AUC "
+         "en CV. En contextos académicos con n pequeño y necesidad de explicabilidad, "
+         f"LR suele ganar — y así fue en este caso (AUC = {auc_lr:.3f} vs {auc_rf:.3f})."),
         ("¿Qué decisiones de preprocesamiento se tomaron (split, escalado, encoding)?",
-         "SPLIT: train/test 70/30 ESTRATIFICADO por la clase positiva (~25 %) para que ambos sets mantengan la misma proporción de riesgo. ESCALADO: StandardScaler dentro de un Pipeline para LR (sensible a escala); RF no lo necesita. ENCODING: no aplica — todas las features son numéricas. SEMILLA: random_state = 42 para reproducibilidad. EXAM_SCORE EXCLUIDO: para evitar data leakage (es lo que se predice)."),
+         "Split train/test 70/30 ESTRATIFICADO por la clase positiva (~25 %) para que "
+         "ambos sets mantengan la misma proporción de riesgo. Escalado: StandardScaler "
+         "dentro de un Pipeline para LR (sensible a la escala); RF no lo necesita. "
+         "Encoding: no aplica, todas las features son numéricas. Semilla: random_state = 42 "
+         "para reproducibilidad. exam_score excluido para evitar data leakage."),
         ("¿Qué métrica es la más adecuada para este caso?",
-         "Hay dos lecturas complementarias. AUC-ROC: evalúa la calidad del RANKING completo, independiente del umbral; útil porque el score se puede leer a distintos cortes según la capacidad operativa de la cátedra. RECALL sobre la clase positiva (riesgo): para el umbral elegido, importa cuántos casos de riesgo real se detectan; un recall del 70-80 % es el objetivo operativo. Accuracy NO es la mejor porque la clase está desbalanceada (~25 % positivos): predecir 'siempre 0' daría 75 % accuracy y sería inútil."),
+         "Se priorizan dos métricas complementarias. AUC-ROC: evalúa la calidad del "
+         "RANKING completo, independiente del umbral, lo que es útil porque el score "
+         "puede leerse a distintos cortes según la capacidad operativa de la cátedra. "
+         "RECALL sobre la clase positiva (riesgo): para el umbral elegido, importa "
+         "cuántos casos de riesgo real se detectan; un recall del 70-80 % es un objetivo "
+         "operativo razonable. Accuracy NO es adecuada porque la clase está desbalanceada "
+         "(~25 % positivos): predecir 'siempre 0' daría 75 % de accuracy y sería inútil."),
         ("¿Es más grave un falso positivo o un falso negativo?",
-         "FALSO NEGATIVO es claramente más grave en este dominio. FN: el score dice 'sin riesgo' y el alumno termina desaprobando; costo: oportunidad perdida de ayudar, impacto académico real. FP: el score dice 'riesgo' y el alumno aprueba; costo: una entrevista innecesaria del tutor (bajo, reversible). Por eso se prioriza RECALL sobre precision al elegir el umbral."),
+         "El FALSO NEGATIVO es claramente más grave en este dominio. FN: el score dice "
+         "'sin riesgo' y el alumno termina desaprobando; el costo es una oportunidad "
+         "perdida de ayudar, con impacto académico real. FP: el score dice 'riesgo' y "
+         "el alumno aprueba; el costo es una entrevista innecesaria del tutor, bajo y "
+         "reversible. Por eso se prioriza RECALL sobre precision al elegir el umbral."),
         ("¿El score es estable ante pequeños cambios en los datos?",
-         "Indicadores de estabilidad observados: AUC en CV (5 folds, train) ≈ AUC en test → no hay sobreajuste fuerte. Score por reglas y score por modelo correlacionan fuertemente pese a construirse de forma totalmente distinta → señal consistente. La tasa real de bajo desempeño crece monotónicamente con el nivel. Limitación: n = 200 es chico; con otra cohorte podría haber variación, por eso se recomienda recalibrar el umbral en cada cuatrimestre."),
+         "Indicadores de estabilidad observados: AUC en CV (5 folds, train) ≈ AUC en test, "
+         "lo que indica que no hay sobreajuste fuerte. Los scores por reglas y por modelo "
+         "correlacionan fuertemente, pese a construirse de forma totalmente distinta — "
+         "una señal de consistencia. La tasa real de bajo desempeño crece monotónicamente "
+         "con el nivel. Limitación: n = 200 es chico, por lo que se recomienda recalibrar "
+         "el umbral en cada cuatrimestre."),
         ("¿El dataset puede contener sesgos que afecten el score?",
-         "Sí, varios. Variables autodeclaradas: hours_studied y sleep_hours dependen de la honestidad del estudiante (sesgo de respuesta). Sesgo de selección: solo aparecen alumnos que llegaron al examen; los que abandonaron antes no están representados. Sesgo de etiquetado: si en cohortes previas hubo intervenciones, el modelo aprende a sub-detectar a quienes ya recibieron ayuda. Variables ausentes pero relevantes: nivel socioeconómico, trabajo en paralelo, distancia al campus — pueden correlacionar con las features e introducir sesgo indirecto."),
+         "Sí, hay varios sesgos posibles. Variables autodeclaradas: hours_studied y "
+         "sleep_hours dependen de la honestidad de la respuesta (sesgo de respuesta). "
+         "Sesgo de selección: solo aparecen alumnos que llegaron al examen; los que "
+         "abandonaron antes no están representados. Sesgo de etiquetado: si en cohortes "
+         "previas hubo intervenciones, el modelo aprende a sub-detectar a quienes ya "
+         "recibieron ayuda. Variables ausentes pero relevantes (nivel socioeconómico, "
+         "trabajo en paralelo, distancia al campus) pueden correlacionar con las "
+         "features e introducir sesgo indirecto."),
         ("¿Cómo se podría explicar el score a una persona no técnica?",
-         "Usando lenguaje natural y los valores propios del alumno: 'Tu score combina cuatro señales: cuánto estudiás (40 %), tu trayectoria previa (30 %), tu asistencia (20 %) y tus horas de sueño (10 %). En tu caso, estudiás X horas y asistís al Y %, eso te ubica en nivel Z. Si aumentás horas de estudio y asistencia (las dos variables más controlables a corto plazo), el score baja.' Cada estudiante debería poder pedir este detalle (derecho a la explicación)."),
+         "Usando lenguaje natural y los valores propios del alumno: 'Tu score combina "
+         "cuatro señales: cuánto estudiás (40 %), tu trayectoria previa (30 %), tu "
+         "asistencia (20 %) y tus horas de sueño (10 %). En tu caso, estudiás X horas "
+         "y asistís al Y %, lo que te ubica en el nivel Z. Si aumentás las horas de "
+         "estudio y la asistencia, que son las dos variables más controlables a corto "
+         "plazo, el score baja.' Cada estudiante debería poder pedir este detalle: es "
+         "su derecho a la explicación."),
         ("¿Qué controles deberían existir antes de implementarlo en producción?",
-         "TÉCNICOS: validación con otra cohorte, monitoreo de drift, pruebas de fairness por carrera / sede / turno, recalibración periódica. HUMANOS: el score ASISTE, NO DECIDE — todo caso pasa por un tutor que puede sobrescribir el nivel; auditoría manual de 'Crítico'. ÉTICOS Y NORMATIVOS: consentimiento informado, derecho a no participar, transparencia sobre qué variables se usan, vía formal para impugnar el nivel asignado. EXCLUSIONES EXPLÍCITAS: nunca incorporar género, edad, etnia, nacionalidad ni nivel socioeconómico como features."),
+         "Controles TÉCNICOS: validación con otra cohorte, monitoreo de drift, pruebas "
+         "de fairness por carrera, sede y turno, y recalibración periódica. Controles "
+         "HUMANOS: el score asiste pero no decide — todo caso pasa por un tutor que "
+         "puede sobrescribir el nivel, y los casos 'Crítico' deben auditarse manualmente. "
+         "Controles ÉTICOS Y NORMATIVOS: consentimiento informado, derecho a no "
+         "participar, transparencia sobre qué variables se usan y vía formal para "
+         "impugnar el nivel asignado. Exclusiones explícitas: nunca incorporar género, "
+         "edad, etnia, nacionalidad ni nivel socioeconómico como features."),
     ]
-    for _preg, _resp in _preguntas_orientadoras_qa:
-        p_q = _DOC.add_paragraph()
-        run_q = p_q.add_run("Pregunta: ")
-        run_q.bold = True
-        p_q.add_run(_preg)
-        p_a = _DOC.add_paragraph()
-        run_a = p_a.add_run("Respuesta: ")
-        run_a.bold = True
-        p_a.add_run(_resp)
-        _DOC.add_paragraph()
+    pagina_qa(pdf, "Preguntas orientadoras para profundizar",
+              _preguntas_orientadoras_qa)
 
     # ── 1. DEFINICIÓN DEL PROBLEMA ──────────────────────────────────────
     pagina_titulo(pdf, "1. Definición del problema")
