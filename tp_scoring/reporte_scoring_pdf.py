@@ -236,14 +236,17 @@ df_salida.to_csv(CSV_OUT, index=False, encoding="utf-8-sig")
 def portada(pdf, titulo, subtitulo=""):
     fig, ax = plt.subplots(figsize=(11, 8.5))
     ax.axis("off")
-    ax.text(0.5, 0.65, titulo, transform=ax.transAxes,
+    ax.text(0.5, 0.68, titulo, transform=ax.transAxes,
             fontsize=26, fontweight="bold", ha="center", va="center", color="#2c3e50")
-    ax.text(0.5, 0.52, subtitulo, transform=ax.transAxes,
+    ax.text(0.5, 0.56, subtitulo, transform=ax.transAxes,
             fontsize=14, ha="center", va="center", color="#7f8c8d")
-    ax.text(0.5, 0.38,
+    ax.text(0.5, 0.44, "Autor: Facundo Pepino",
+            transform=ax.transAxes, fontsize=14, fontweight="bold",
+            ha="center", va="center", color="#2c3e50")
+    ax.text(0.5, 0.36,
             f"Dataset: Student exam score — {N} estudiantes, {len(df.columns) - 4} variables originales",
             transform=ax.transAxes, fontsize=11, ha="center", va="center", color="#95a5a6")
-    ax.text(0.5, 0.30,
+    ax.text(0.5, 0.28,
             "TP Ciencia de Datos 2026 — UTN FRSFCO",
             transform=ax.transAxes, fontsize=10, ha="center", va="center", color="#95a5a6")
     pdf.savefig(fig); plt.close()
@@ -371,6 +374,85 @@ with PdfPages(_pdf_out) as pdf:
     portada(pdf,
             "Scoring de Riesgo Académico",
             "Diseño, construcción y validación")
+
+    # ── CONSIGNA DEL TP ─────────────────────────────────────────────────
+    pagina_titulo(pdf, "Consigna del TP")
+
+    pagina_texto(pdf, "6. Actividades que deberán realizar", [
+        " 1. Definir el problema de negocio o académico que se quiere apoyar con un",
+        "    score.",
+        " 2. Identificar la unidad de análisis (cliente, estudiante, transacción, etc.).",
+        " 3. Determinar qué significa el score (ej. probabilidad de fraude, riesgo de",
+        "    abandono, propensión a comprar).",
+        " 4. Explorar el dataset propuesto: estadísticas descriptivas, valores faltantes,",
+        "    correlaciones.",
+        " 5. Limpiar y transformar los datos (codificación, normalización si",
+        "    corresponde).",
+        " 6. Construir variables derivadas que aporten información al score.",
+        " 7. Diseñar un scoring basado en reglas o pesos (por ejemplo, mediante",
+        "    combinación lineal o reglas if-then).",
+        " 8. Definir niveles de score (bajo / medio / alto / crítico) y su",
+        "    interpretación.",
+        " 9. Asociar acciones sugeridas a cada nivel (ej. ofrecer descuento, llamar",
+        "    al cliente, alertar al docente, recomendar tutoría).",
+        "10. Implementar un modelo simple con scikit-learn (por ejemplo, regresión",
+        "    logística o árbol de decisión) para estimar una probabilidad y compararla",
+        "    con el score de reglas.",
+        "11. Comparar el scoring por reglas y el scoring por modelo, analizando sus",
+        "    diferencias.",
+        "12. Evaluar el modelo con métricas básicas: matriz de confusión, accuracy,",
+        "    precision, recall, F1, AUC.",
+        "13. Reflexionar sobre los falsos positivos y falsos negativos en el contexto",
+        "    elegido.",
+        "14. Visualizar la distribución de los scores y los niveles obtenidos.",
+        "15. Presentar conclusiones, limitaciones y propuestas de mejora.",
+    ])
+
+    pagina_titulo(pdf, "7. Preguntas orientadoras para profundizar")
+
+    pagina_texto(pdf, "Comprensión del problema", [
+        "• ¿Qué decisión concreta se busca apoyar con el score?",
+        "",
+        "• ¿Quién lo utilizará y en qué momento?",
+        "",
+        "• ¿Cuál es la diferencia entre scoring, clasificación y predicción?",
+    ])
+
+    pagina_texto(pdf, "Diseño del score", [
+        "• ¿Qué variables son más relevantes y por qué?",
+        "",
+        "• ¿Cómo se justifican los pesos asignados?",
+        "",
+        "• ¿Qué pasa si una variable está en una escala distinta a las demás?",
+        "",
+        "• ¿Cómo se eligen los umbrales o niveles de score?",
+    ])
+
+    pagina_texto(pdf, "Modelo predictivo", [
+        "• ¿Qué tipo de problema es: clasificación binaria, multiclase, regresión?",
+        "",
+        "• ¿Por qué se eligió ese algoritmo (regresión logística, árbol, random",
+        "  forest, etc.)?",
+        "",
+        "• ¿Qué decisiones de preprocesamiento se tomaron (split, escalado,",
+        "  encoding)?",
+    ])
+
+    pagina_texto(pdf, "Evaluación", [
+        "• ¿Qué métrica es la más adecuada para este caso?",
+        "",
+        "• ¿Es más grave un falso positivo o un falso negativo?",
+        "",
+        "• ¿El score es estable ante pequeños cambios en los datos?",
+    ])
+
+    pagina_texto(pdf, "Ética, sesgos y explicabilidad", [
+        "• ¿El dataset puede contener sesgos que afecten el score?",
+        "",
+        "• ¿Cómo se podría explicar el score a una persona no técnica?",
+        "",
+        "• ¿Qué controles deberían existir antes de implementarlo en producción?",
+    ])
 
     # ── 1. DEFINICIÓN DEL PROBLEMA ──────────────────────────────────────
     pagina_titulo(pdf, "1. Definición del problema")
