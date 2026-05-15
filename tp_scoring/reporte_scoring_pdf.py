@@ -549,7 +549,7 @@ with PdfPages(_pdf_out) as pdf:
     # ── 1. DEFINICIÓN DEL PROBLEMA ──────────────────────────────────────
     pagina_titulo(pdf, "1. Definición del problema")
 
-    pagina_texto(pdf, "Definición del problema", [
+    pagina_texto(pdf, "Qué decisión se busca apoyar y para quién", [
         "DECISIÓN A APOYAR",
         "Detectar antes del examen final qué estudiantes tienen mayor probabilidad de bajo",
         "desempeño, para que la cátedra pueda intervenir (tutorías, recuperatorios, seguimiento).",
@@ -614,7 +614,7 @@ with PdfPages(_pdf_out) as pdf:
                  "Correlaciones con exam_score (ordenadas)",
                  col_widths=[0.5, 0.3])
 
-    pagina_texto(pdf, "Hallazgos del EDA", [
+    pagina_texto(pdf, "Principales hallazgos de la exploración", [
         f"• {N} estudiantes, sin nulos ni duplicados → no requiere imputación.",
         "",
         f"• exam_score va de {df['exam_score'].min():.1f} a {df['exam_score'].max():.1f} —",
@@ -630,10 +630,10 @@ with PdfPages(_pdf_out) as pdf:
     ])
 
     # ── 3. VARIABLE OBJETIVO ────────────────────────────────────────────
-    pagina_titulo(pdf, "3. Variable objetivo")
+    pagina_titulo(pdf, "3. Variable objetivo (qué se quiere predecir)")
 
     tasa_pos = df["riesgo_bajo_desempeno"].mean()
-    pagina_texto(pdf, "Definición de riesgo_bajo_desempeno", [
+    pagina_texto(pdf, "Cómo se define la variable de riesgo", [
         "DECISIÓN",
         f"Como exam_score no está en escala 0-100 estándar, el umbral se define",
         "usando el cuartil inferior de la propia distribución: el 25 % de estudiantes",
@@ -652,7 +652,7 @@ with PdfPages(_pdf_out) as pdf:
     ])
 
     # ── 4. SCORING POR REGLAS ───────────────────────────────────────────
-    pagina_titulo(pdf, "4. Scoring por reglas")
+    pagina_titulo(pdf, "4. Scoring por reglas (pesos y rangos definidos a mano)")
 
     data = [
         ["hours_studied",      "40 %", "Mayor correlación con la nota (0.78). Variable más controlable por el estudiante."],
@@ -688,7 +688,7 @@ with PdfPages(_pdf_out) as pdf:
     pdf.savefig(fig); plt.close()
 
     # ── 5. NIVELES Y ACCIONES ───────────────────────────────────────────
-    pagina_titulo(pdf, "5. Niveles de riesgo y acciones")
+    pagina_titulo(pdf, "5. Niveles de riesgo y acción recomendada")
 
     conteo_reglas = df["nivel_reglas"].value_counts().reindex(ORDEN_NIVELES, fill_value=0)
     data = [
@@ -727,7 +727,7 @@ with PdfPages(_pdf_out) as pdf:
                  "Validación: ¿el score por reglas captura riesgo real?",
                  col_widths=[0.18, 0.18, 0.25, 0.30])
 
-    pagina_texto(pdf, "Lectura de la validación", [
+    pagina_texto(pdf, "El score crece con el riesgo real (validación empírica)", [
         "Si el score por reglas funciona, la 'tasa de bajo desempeño' debe crecer",
         "monotónicamente del nivel Bajo al Crítico. Es lo que se observa:",
         "",
@@ -741,9 +741,9 @@ with PdfPages(_pdf_out) as pdf:
     ])
 
     # ── 6. MODELO PREDICTIVO ────────────────────────────────────────────
-    pagina_titulo(pdf, "6. Modelo predictivo (scikit-learn)")
+    pagina_titulo(pdf, "6. Modelo predictivo entrenado con scikit-learn")
 
-    pagina_texto(pdf, "Decisiones de modelado", [
+    pagina_texto(pdf, "Tipo de problema, variables y modelos comparados", [
         "TIPO DE PROBLEMA",
         "Clasificación binaria (riesgo / no riesgo). El usuario final necesita decidir",
         "intervenir o no — output operativo, no estimar la nota exacta.",
@@ -793,7 +793,7 @@ with PdfPages(_pdf_out) as pdf:
     pdf.savefig(fig); plt.close()
 
     # ── 7. COMPARACIÓN REGLAS vs MODELO ─────────────────────────────────
-    pagina_titulo(pdf, "7. Comparación reglas vs modelo")
+    pagina_titulo(pdf, "7. Comparación entre score por reglas y score por modelo")
 
     auc_reglas = roc_auc_score(df["riesgo_bajo_desempeno"], df["score_reglas"])
     auc_modelo_full = roc_auc_score(df["riesgo_bajo_desempeno"], df["score_modelo"])
@@ -833,9 +833,9 @@ with PdfPages(_pdf_out) as pdf:
                  col_widths=[0.20, 0.15, 0.15, 0.15, 0.15])
 
     # ── 8. EVALUACIÓN ───────────────────────────────────────────────────
-    pagina_titulo(pdf, "8. Evaluación con métricas")
+    pagina_titulo(pdf, "8. Evaluación del modelo con métricas de clasificación")
 
-    pagina_texto(pdf, "Falso positivo vs falso negativo", [
+    pagina_texto(pdf, "Qué error pesa más en este problema", [
         "EN ESTE PROBLEMA, EL FALSO NEGATIVO ES MÁS GRAVE",
         "",
         "• FALSO NEGATIVO: el score dice 'sin riesgo' pero el estudiante desaprueba.",
@@ -931,7 +931,7 @@ with PdfPages(_pdf_out) as pdf:
     pdf.savefig(fig); plt.close()
 
     # Lectura de la matriz
-    pagina_texto(pdf, "Lectura de la matriz de confusión", [
+    pagina_texto(pdf, "Qué dice la matriz de confusión en el umbral operativo", [
         f"En el set de test (n = {total_test}) y con umbral operativo {THRESHOLD_OP}:",
         "",
         f"  → De {fn + tp} estudiantes con riesgo real, el modelo detectó {tp}",
@@ -978,7 +978,7 @@ with PdfPages(_pdf_out) as pdf:
                  col_widths=[0.10] * 8)
 
     # ── 9. CASOS INDIVIDUALES ───────────────────────────────────────────
-    pagina_titulo(pdf, "9. Casos individuales")
+    pagina_titulo(pdf, "9. Casos individuales (tres estudiantes de ejemplo)")
 
     ej_bajo = df.sort_values("score_modelo").iloc[0]
     ej_med = df.iloc[(df["score_modelo"] - 50).abs().idxmin()]
@@ -1006,7 +1006,7 @@ with PdfPages(_pdf_out) as pdf:
                  col_widths=[0.10, 0.07, 0.07, 0.07, 0.08, 0.07, 0.07, 0.18, 0.18],
                  fontsize=8.5)
 
-    pagina_texto(pdf, "Cómo se explica el score a un usuario no técnico", [
+    pagina_texto(pdf, "Ejemplo: cómo explicar el score a un estudiante", [
         "EJEMPLO — caso crítico",
         "",
         f"Estudiante {ej_crit['student_id']} recibió un score alto porque combina:",
@@ -1023,9 +1023,9 @@ with PdfPages(_pdf_out) as pdf:
     ])
 
     # ── 9.5 SCORES ADICIONALES ──────────────────────────────────────────
-    pagina_titulo(pdf, "10. Scores adicionales derivados")
+    pagina_titulo(pdf, "10. Nueve scores complementarios para otras decisiones")
 
-    pagina_texto(pdf, "Por qué más de un score", [
+    pagina_texto(pdf, "Para qué sirven los 9 scores complementarios", [
         "El score de riesgo es solo un ángulo del problema. A partir del mismo dataset",
         "podemos construir scores complementarios que apoyan distintas decisiones de la",
         "cátedra: priorizar tutorías, reconocer trayectorias positivas, detectar",
@@ -1155,7 +1155,7 @@ with PdfPages(_pdf_out) as pdf:
                  "Tres casos vistos con los 11 scores",
                  col_widths=[0.12, 0.05] + [0.07] * 11, fontsize=7.5)
 
-    pagina_texto(pdf, "Cómo combinar los scores en una decisión", [
+    pagina_texto(pdf, "Cómo combinar varios scores para una decisión concreta", [
         "Distintos scores cuentan historias distintas del MISMO estudiante:",
         "",
         "• riesgo alto + potencial alto         → prioridad máxima de tutoría (ROI alto)",
@@ -1202,7 +1202,7 @@ with PdfPages(_pdf_out) as pdf:
     # ── FÓRMULAS DE CÁLCULO (11 PÁGINAS, UNA POR SCORE) ─────────────────
     pagina_titulo(pdf, "Cómo se calcula cada score\n(11 fórmulas — una por página)")
 
-    pagina_texto(pdf, "Notación común a todas las fórmulas", [
+    pagina_texto(pdf, "Helpers y notación usados en las fórmulas", [
         "Helpers usados en varias fórmulas. Todos los scores devuelven 0-100.",
         "",
         "  norm_riesgo(v, bueno, malo)  →  mapea linealmente el rango [bueno, malo]",
