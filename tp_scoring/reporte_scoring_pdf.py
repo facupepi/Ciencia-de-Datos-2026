@@ -19,6 +19,9 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 
+from docx import Document
+from docx.shared import Pt, RGBColor
+
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
@@ -35,6 +38,7 @@ warnings.filterwarnings("ignore")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV = os.path.join(BASE_DIR, "Student exam score - 7 de mayo.csv")
 PDF_PATH = os.path.join(BASE_DIR, "reporte_scoring.pdf")
+DOCX_PATH = os.path.join(BASE_DIR, "reporte_scoring.docx")
 CSV_OUT = os.path.join(BASE_DIR, "scoring_resultados.csv")
 
 RANDOM_STATE = 42
@@ -253,11 +257,11 @@ def portada(pdf, titulo, subtitulo=""):
 
 
 def pagina_titulo(pdf, titulo):
-    fig, ax = plt.subplots(figsize=(11, 8.5))
-    ax.axis("off")
-    ax.text(0.5, 0.5, titulo, transform=ax.transAxes,
-            fontsize=22, fontweight="bold", ha="center", va="center", color="#2c3e50")
-    pdf.savefig(fig); plt.close()
+    # El texto del reporte va al .docx, no al PDF.
+    if "_DOC" in globals() and _DOC is not None:
+        h = _DOC.add_heading(titulo, level=1)
+        for run in h.runs:
+            run.font.color.rgb = RGBColor(0x2C, 0x3E, 0x50)
 
 
 def render_tabla(pdf, data, col_labels, titulo, col_widths=None,
@@ -283,14 +287,15 @@ def render_tabla(pdf, data, col_labels, titulo, col_widths=None,
 
 
 def pagina_texto(pdf, titulo, lineas):
-    fig, ax = plt.subplots(figsize=(11, 8.5))
-    ax.axis("off")
-    ax.text(0.05, 0.95, titulo, transform=ax.transAxes,
-            fontsize=16, fontweight="bold", va="top", color="#2c3e50")
-    ax.text(0.05, 0.86, "\n".join(lineas), transform=ax.transAxes,
-            fontsize=10.5, va="top", wrap=True, linespacing=1.55,
-            fontfamily="sans-serif", color="#34495e")
-    pdf.savefig(fig); plt.close()
+    # El texto del reporte va al .docx, no al PDF.
+    if "_DOC" in globals() and _DOC is not None:
+        h = _DOC.add_heading(titulo, level=2)
+        for run in h.runs:
+            run.font.color.rgb = RGBColor(0x2C, 0x3E, 0x50)
+        for ln in lineas:
+            p = _DOC.add_paragraph(ln)
+            for run in p.runs:
+                run.font.size = Pt(11)
 
 
 def pagina_detalle_score(pdf, num, total, codigo, descripcion,
@@ -357,17 +362,47 @@ def pagina_detalle_score(pdf, num, total, codigo, descripcion,
 
 
 # Detectar PDF bloqueado (preview abierto en VS Code)
-_pdf_out = PDF_PATH
-if os.path.exists(PDF_PATH):
+def _path_libre(path, ext):
+    if not os.path.exists(path):
+        return path
     try:
-        with open(PDF_PATH, "ab"):
+        with open(path, "ab"):
             pass
+        return path
     except PermissionError:
-        _pdf_out = PDF_PATH.replace(".pdf", "_nuevo.pdf")
-        print(f"[!] {os.path.basename(PDF_PATH)} bloqueado, guardando como {os.path.basename(_pdf_out)}")
+        pass
+    for i in range(1, 20):
+        alt = path.replace(ext, f"_nuevo{i if i > 1 else ''}{ext}")
+        if not os.path.exists(alt):
+            return alt
+        try:
+            with open(alt, "ab"):
+                pass
+            return alt
+        except PermissionError:
+            continue
+    return path
+
+_pdf_out = _path_libre(PDF_PATH, ".pdf")
+if _pdf_out != PDF_PATH:
+    print(f"[!] {os.path.basename(PDF_PATH)} bloqueado, guardando como {os.path.basename(_pdf_out)}")
+
+_docx_out = _path_libre(DOCX_PATH, ".docx")
+if _docx_out != DOCX_PATH:
+    print(f"[!] {os.path.basename(DOCX_PATH)} bloqueado, guardando como {os.path.basename(_docx_out)}")
+
+# Documento Word global usado por pagina_titulo / pagina_texto
+_DOC = Document()
+_titulo_principal = _DOC.add_heading("Scoring de Riesgo Académico", level=0)
+_DOC.add_paragraph("Diseño, construcción y validación").italic = True
+_DOC.add_paragraph(
+    f"Autor: Facundo Pepino — TP Ciencia de Datos 2026 — UTN FRSFCO\n"
+    f"Dataset: Student exam score — {N} estudiantes."
+)
+_DOC.add_paragraph()
 
 
-print("[4/4] Generando PDF...")
+print("[4/4] Generando PDF y DOCX...")
 with PdfPages(_pdf_out) as pdf:
 
     # ── PORTADA ─────────────────────────────────────────────────────────
@@ -1659,5 +1694,7 @@ with PdfPages(_pdf_out) as pdf:
     ])
 
 print()
+_DOC.save(_docx_out)
 print(f"[OK] PDF generado: {_pdf_out}")
+print(f"[OK] DOCX generado: {_docx_out}")
 print(f"[OK] CSV de resultados: {CSV_OUT}")
