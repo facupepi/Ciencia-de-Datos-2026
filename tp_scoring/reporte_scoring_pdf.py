@@ -658,19 +658,21 @@ _pdf_out = _path_libre(PDF_PATH, ".pdf")
 if _pdf_out != PDF_PATH:
     print(f"[!] {os.path.basename(PDF_PATH)} bloqueado, guardando como {os.path.basename(_pdf_out)}")
 
-_docx_out = _path_libre(DOCX_PATH, ".docx")
-if _docx_out != DOCX_PATH:
-    print(f"[!] {os.path.basename(DOCX_PATH)} bloqueado, guardando como {os.path.basename(_docx_out)}")
+# _docx_out = _path_libre(DOCX_PATH, ".docx")
+# if _docx_out != DOCX_PATH:
+#     print(f"[!] {os.path.basename(DOCX_PATH)} bloqueado, guardando como {os.path.basename(_docx_out)}")
 
 # Documento Word global usado por pagina_titulo / pagina_texto
-_DOC = Document()
-_titulo_principal = _DOC.add_heading("Scoring de Riesgo Académico", level=0)
-_DOC.add_paragraph("Diseño, construcción y validación").italic = True
-_DOC.add_paragraph(
-    f"Autor: Facundo Pepino — TP Ciencia de Datos 2026 — UTN FRSFCO\n"
-    f"Dataset: Student exam score — {N} estudiantes."
-)
-_DOC.add_paragraph()
+# DESHABILITADO: solo se genera el PDF
+_DOC = None
+# _DOC = Document()
+# _titulo_principal = _DOC.add_heading("Scoring de Riesgo Académico", level=0)
+# _DOC.add_paragraph("Diseño, construcción y validación").italic = True
+# _DOC.add_paragraph(
+#     f"Autor: Facundo Pepino — TP Ciencia de Datos 2026 — UTN FRSFCO\n"
+#     f"Dataset: Student exam score — {N} estudiantes."
+# )
+# _DOC.add_paragraph()
 
 
 print("[4/4] Generando PDF y DOCX...")
@@ -1855,7 +1857,7 @@ with PdfPages(_pdf_out) as pdf:
     ])
 
 print()
-_DOC.save(_docx_out)
+# _DOC.save(_docx_out)  # DESHABILITADO: solo se genera el PDF
 print(f"[OK] PDF generado: {_pdf_out}")
-print(f"[OK] DOCX generado: {_docx_out}")
+# print(f"[OK] DOCX generado: {_docx_out}")
 print(f"[OK] CSV de resultados: {CSV_OUT}")
