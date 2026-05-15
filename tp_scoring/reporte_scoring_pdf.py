@@ -499,198 +499,52 @@ with PdfPages(_pdf_out) as pdf:
         p_a.add_run(_resp)
         _DOC.add_paragraph()
 
-    pagina_titulo(pdf, "7. Preguntas orientadoras para profundizar")
+    pagina_titulo(pdf, "Preguntas orientadoras para profundizar")
 
-    pagina_texto(pdf, "Comprensión del problema", [
-        "• ¿Qué decisión concreta se busca apoyar con el score?",
-        "",
-        "• ¿Quién lo utilizará y en qué momento?",
-        "",
-        "• ¿Cuál es la diferencia entre scoring, clasificación y predicción?",
-    ])
-
-    pagina_texto(pdf, "Respuestas — Comprensión del problema", [
-        "¿QUÉ DECISIÓN CONCRETA SE BUSCA APOYAR CON EL SCORE?",
-        "Identificar, antes del examen final, qué estudiantes tienen mayor riesgo",
-        "de bajo desempeño para activar intervenciones de la cátedra: tutorías,",
-        "material de refuerzo, seguimiento personalizado y, en casos críticos,",
-        "tutoría obligatoria con seguimiento semanal.",
-        "",
-        "¿QUIÉN LO UTILIZARÁ Y EN QUÉ MOMENTO?",
-        "Tutores, coordinador académico y docente del curso. Se aplica al inicio",
-        "o a mitad del cuatrimestre, ANTES del examen final — por eso exam_score",
-        "no se usa como variable predictora (sería data leakage: se predeciría",
-        "una decisión usando información que aún no se conoce).",
-        "",
-        "¿CUÁL ES LA DIFERENCIA ENTRE SCORING, CLASIFICACIÓN Y PREDICCIÓN?",
-        "• Predicción: estima el VALOR de una variable continua (ej. la nota",
-        "  exacta en el examen). Es regresión.",
-        "• Clasificación: asigna una ETIQUETA discreta (ej. desaprueba sí/no).",
-        "  Su salida es binaria o multiclase, no permite priorizar dentro de",
-        "  cada clase.",
-        "• Scoring: ORDENA a los individuos en una escala continua (0-100) para",
-        "  priorizar acciones. Permite elegir el umbral según la capacidad",
-        "  operativa (cuántas tutorías hay disponibles).",
-    ])
-
-    pagina_texto(pdf, "Diseño del score", [
-        "• ¿Qué variables son más relevantes y por qué?",
-        "",
-        "• ¿Cómo se justifican los pesos asignados?",
-        "",
-        "• ¿Qué pasa si una variable está en una escala distinta a las demás?",
-        "",
-        "• ¿Cómo se eligen los umbrales o niveles de score?",
-    ])
-
-    pagina_texto(pdf, "Respuestas — Diseño del score", [
-        "¿QUÉ VARIABLES SON MÁS RELEVANTES Y POR QUÉ?",
-        "Según el EDA, hours_studied es la más fuerte (r = 0.78 con exam_score),",
-        "seguida de previous_scores (r = 0.43), attendance_percent (r = 0.23) y",
-        "sleep_hours (r = 0.19). Las dos primeras concentran ~70 % del poder",
-        "predictivo; las dos restantes se incluyen porque tienen sustento",
-        "teórico (compromiso y descanso afectan rendimiento) aunque correlacionen",
-        "menos.",
-        "",
-        "¿CÓMO SE JUSTIFICAN LOS PESOS ASIGNADOS?",
-        "Los pesos (40 / 30 / 20 / 10 %) replican el ORDEN de correlación con",
-        "exam_score y respetan que la suma sea 100 %. No vienen de un ajuste",
-        "automático sino de criterio experto + evidencia del EDA. Esto los hace",
-        "auditables y explicables ante un usuario no técnico.",
-        "",
-        "¿QUÉ PASA SI UNA VARIABLE ESTÁ EN UNA ESCALA DISTINTA?",
-        "Hay que NORMALIZAR antes de combinar. En el score por reglas se usa",
-        "norm_riesgo(valor, bueno, malo) que mapea cada variable a [0, 100] con",
-        "rangos definidos por dominio. En el modelo, StandardScaler estandariza",
-        "(media 0, std 1) para que LogisticRegression no penalice variables",
-        "con mayor varianza nominal.",
-        "",
-        "¿CÓMO SE ELIGEN LOS UMBRALES O NIVELES DE SCORE?",
-        "Se usaron cortes en 30 / 50 / 70 que dividen la escala en cuatro",
-        "niveles operativos (Bajo / Medio / Alto / Crítico) y se VALIDARON",
-        "empíricamente: la tasa real de bajo desempeño debe crecer monotónicamente",
-        "de Bajo a Crítico, lo que se cumple. En otra cohorte habría que",
-        "recalibrarlos.",
-    ])
-
-    pagina_texto(pdf, "Modelo predictivo", [
-        "• ¿Qué tipo de problema es: clasificación binaria, multiclase, regresión?",
-        "",
-        "• ¿Por qué se eligió ese algoritmo (regresión logística, árbol, random",
-        "  forest, etc.)?",
-        "",
-        "• ¿Qué decisiones de preprocesamiento se tomaron (split, escalado,",
-        "  encoding)?",
-    ])
-
-    pagina_texto(pdf, "Respuestas — Modelo predictivo", [
-        "¿QUÉ TIPO DE PROBLEMA ES?",
-        "CLASIFICACIÓN BINARIA: predice riesgo_bajo_desempeno ∈ {0, 1}. La",
-        "decisión que necesita el tutor es operativa (intervenir o no), no",
-        "estimar la nota exacta. Aunque internamente se trabaje con la",
-        "probabilidad continua P(riesgo), eso es para SCORING, no para",
-        "regresión sobre exam_score.",
-        "",
-        "¿POR QUÉ SE ELIGIÓ ESE ALGORITMO?",
-        "Se compararon dos modelos con validación cruzada (5 folds, AUC):",
-        "• Logistic Regression: lineal, INTERPRETABLE (coeficientes leíbles),",
-        "  rápido, sirve como baseline robusto.",
-        "• Random Forest: capta no-linealidades e interacciones, más robusto a",
-        "  outliers, no requiere escalado.",
-        "Se eligió el de mejor AUC en CV. En contextos académicos con n pequeño",
-        f"y necesidad de explicabilidad, LR suele ganar — fue el caso (AUC = {auc_lr:.3f}",
-        f"vs {auc_rf:.3f}).",
-        "",
-        "¿QUÉ DECISIONES DE PREPROCESAMIENTO SE TOMARON?",
-        "• SPLIT: train/test 70/30 ESTRATIFICADO por la clase positiva (~25 %)",
-        "  para que ambos sets mantengan la misma proporción de riesgo.",
-        "• ESCALADO: StandardScaler dentro de un Pipeline para LR (sensible a",
-        "  escala). RF no lo necesita.",
-        "• ENCODING: no aplica — todas las features son numéricas.",
-        "• SEMILLA: random_state = 42 para reproducibilidad.",
-        "• EXAM_SCORE EXCLUIDO: para evitar data leakage (es lo que se predice).",
-    ])
-
-    pagina_texto(pdf, "Evaluación", [
-        "• ¿Qué métrica es la más adecuada para este caso?",
-        "",
-        "• ¿Es más grave un falso positivo o un falso negativo?",
-        "",
-        "• ¿El score es estable ante pequeños cambios en los datos?",
-    ])
-
-    pagina_texto(pdf, "Respuestas — Evaluación", [
-        "¿QUÉ MÉTRICA ES LA MÁS ADECUADA PARA ESTE CASO?",
-        "Hay dos lecturas complementarias:",
-        "• AUC-ROC: evalúa la calidad del RANKING completo, independiente del",
-        "  umbral. Útil porque el score se puede leer a distintos cortes según",
-        "  la capacidad operativa de la cátedra.",
-        "• RECALL sobre la clase positiva (riesgo): para el umbral elegido,",
-        "  importa cuántos casos de riesgo real se detectan. Un recall del 70-80 %",
-        "  es el objetivo operativo.",
-        "Accuracy NO es la mejor porque la clase está desbalanceada (~25 % positivos):",
-        "predecir 'siempre 0' daría 75 % accuracy y sería inútil.",
-        "",
-        "¿ES MÁS GRAVE UN FALSO POSITIVO O UN FALSO NEGATIVO?",
-        "FALSO NEGATIVO es claramente más grave en este dominio:",
-        "• FN: el score dice 'sin riesgo' y el alumno termina desaprobando.",
-        "  Costo: oportunidad perdida de ayudar; impacto académico real.",
-        "• FP: el score dice 'riesgo' y el alumno aprueba.",
-        "  Costo: una entrevista innecesaria del tutor (bajo, reversible).",
-        "Por eso se prioriza RECALL sobre precision al elegir el umbral.",
-        "",
-        "¿EL SCORE ES ESTABLE ANTE PEQUEÑOS CAMBIOS EN LOS DATOS?",
-        "Indicadores de estabilidad observados:",
-        "• AUC en CV (5 folds, train) ≈ AUC en test → no hay sobreajuste fuerte.",
-        "• Score por reglas y score por modelo correlacionan fuertemente pese a",
-        "  construirse de forma totalmente distinta → señal consistente.",
-        "• La tasa real de bajo desempeño crece monotónicamente con el nivel.",
-        "Limitación: n = 200 es chico. Con otra cohorte podría haber variación,",
-        "por eso se recomienda recalibrar el umbral en cada cuatrimestre.",
-    ])
-
-    pagina_texto(pdf, "Ética, sesgos y explicabilidad", [
-        "• ¿El dataset puede contener sesgos que afecten el score?",
-        "",
-        "• ¿Cómo se podría explicar el score a una persona no técnica?",
-        "",
-        "• ¿Qué controles deberían existir antes de implementarlo en producción?",
-    ])
-
-    pagina_texto(pdf, "Respuestas — Ética, sesgos y explicabilidad", [
-        "¿EL DATASET PUEDE CONTENER SESGOS QUE AFECTEN EL SCORE?",
-        "Sí, varios:",
-        "• Variables autodeclaradas: hours_studied y sleep_hours dependen de la",
-        "  honestidad del estudiante (sesgo de respuesta).",
-        "• Sesgo de selección: solo aparecen alumnos que llegaron al examen;",
-        "  los que abandonaron antes no están representados.",
-        "• Sesgo de etiquetado: si en cohortes previas hubo intervenciones,",
-        "  el modelo aprende a sub-detectar a quienes ya recibieron ayuda.",
-        "• Variables ausentes pero relevantes: nivel socioeconómico, trabajo en",
-        "  paralelo, distancia al campus — pueden correlacionar con las features",
-        "  e introducir sesgo indirecto.",
-        "",
-        "¿CÓMO SE PODRÍA EXPLICAR EL SCORE A UNA PERSONA NO TÉCNICA?",
-        "Usando lenguaje natural y los valores propios del alumno:",
-        "  'Tu score combina cuatro señales: cuánto estudiás (40 %), tu",
-        "   trayectoria previa (30 %), tu asistencia (20 %) y tus horas de",
-        "   sueño (10 %). En tu caso, estudiás X horas y asistís al Y %, eso",
-        "   te ubica en nivel Z. Si aumentás horas de estudio y asistencia",
-        "   (las dos variables más controlables a corto plazo), el score baja.'",
-        "Cada estudiante debería poder pedir este detalle (derecho a la",
-        "explicación).",
-        "",
-        "¿QUÉ CONTROLES DEBERÍAN EXISTIR ANTES DE IMPLEMENTARLO?",
-        "• TÉCNICOS: validación con otra cohorte, monitoreo de drift, pruebas",
-        "  de fairness por carrera / sede / turno, recalibración periódica.",
-        "• HUMANOS: el score ASISTE, NO DECIDE — todo caso pasa por un tutor",
-        "  que puede sobrescribir el nivel. Auditoría manual de 'Crítico'.",
-        "• ÉTICOS Y NORMATIVOS: consentimiento informado, derecho a no",
-        "  participar, transparencia sobre qué variables se usan, vía formal",
-        "  para impugnar el nivel asignado.",
-        "• EXCLUSIONES EXPLÍCITAS: nunca incorporar género, edad, etnia,",
-        "  nacionalidad ni nivel socioeconómico como features.",
-    ])
+    _preguntas_orientadoras_qa = [
+        ("¿Qué decisión concreta se busca apoyar con el score?",
+         "Identificar, antes del examen final, qué estudiantes tienen mayor riesgo de bajo desempeño para activar intervenciones de la cátedra: tutorías, material de refuerzo, seguimiento personalizado y, en casos críticos, tutoría obligatoria con seguimiento semanal."),
+        ("¿Quién lo utilizará y en qué momento?",
+         "Tutores, coordinador académico y docente del curso. Se aplica al inicio o a mitad del cuatrimestre, ANTES del examen final — por eso exam_score no se usa como variable predictora (sería data leakage: se predeciría una decisión usando información que aún no se conoce)."),
+        ("¿Cuál es la diferencia entre scoring, clasificación y predicción?",
+         "Predicción: estima el VALOR de una variable continua (ej. la nota exacta en el examen). Es regresión. Clasificación: asigna una ETIQUETA discreta (ej. desaprueba sí/no); su salida es binaria o multiclase, no permite priorizar dentro de cada clase. Scoring: ORDENA a los individuos en una escala continua (0-100) para priorizar acciones; permite elegir el umbral según la capacidad operativa (cuántas tutorías hay disponibles)."),
+        ("¿Qué variables son más relevantes y por qué?",
+         "Según el EDA, hours_studied es la más fuerte (r = 0.78 con exam_score), seguida de previous_scores (r = 0.43), attendance_percent (r = 0.23) y sleep_hours (r = 0.19). Las dos primeras concentran ~70 % del poder predictivo; las dos restantes se incluyen porque tienen sustento teórico (compromiso y descanso afectan rendimiento) aunque correlacionen menos."),
+        ("¿Cómo se justifican los pesos asignados?",
+         "Los pesos (40 / 30 / 20 / 10 %) replican el ORDEN de correlación con exam_score y respetan que la suma sea 100 %. No vienen de un ajuste automático sino de criterio experto + evidencia del EDA. Esto los hace auditables y explicables ante un usuario no técnico."),
+        ("¿Qué pasa si una variable está en una escala distinta a las demás?",
+         "Hay que NORMALIZAR antes de combinar. En el score por reglas se usa norm_riesgo(valor, bueno, malo) que mapea cada variable a [0, 100] con rangos definidos por dominio. En el modelo, StandardScaler estandariza (media 0, std 1) para que LogisticRegression no penalice variables con mayor varianza nominal."),
+        ("¿Cómo se eligen los umbrales o niveles de score?",
+         "Se usaron cortes en 30 / 50 / 70 que dividen la escala en cuatro niveles operativos (Bajo / Medio / Alto / Crítico) y se VALIDARON empíricamente: la tasa real de bajo desempeño debe crecer monotónicamente de Bajo a Crítico, lo que se cumple. En otra cohorte habría que recalibrarlos."),
+        ("¿Qué tipo de problema es: clasificación binaria, multiclase, regresión?",
+         "CLASIFICACIÓN BINARIA: predice riesgo_bajo_desempeno ∈ {0, 1}. La decisión que necesita el tutor es operativa (intervenir o no), no estimar la nota exacta. Aunque internamente se trabaje con la probabilidad continua P(riesgo), eso es para SCORING, no para regresión sobre exam_score."),
+        ("¿Por qué se eligió ese algoritmo (regresión logística, árbol, random forest, etc.)?",
+         f"Se compararon dos modelos con validación cruzada (5 folds, AUC). Logistic Regression: lineal, INTERPRETABLE (coeficientes leíbles), rápido, sirve como baseline robusto. Random Forest: capta no-linealidades e interacciones, más robusto a outliers, no requiere escalado. Se eligió el de mejor AUC en CV. En contextos académicos con n pequeño y necesidad de explicabilidad, LR suele ganar — fue el caso (AUC = {auc_lr:.3f} vs {auc_rf:.3f})."),
+        ("¿Qué decisiones de preprocesamiento se tomaron (split, escalado, encoding)?",
+         "SPLIT: train/test 70/30 ESTRATIFICADO por la clase positiva (~25 %) para que ambos sets mantengan la misma proporción de riesgo. ESCALADO: StandardScaler dentro de un Pipeline para LR (sensible a escala); RF no lo necesita. ENCODING: no aplica — todas las features son numéricas. SEMILLA: random_state = 42 para reproducibilidad. EXAM_SCORE EXCLUIDO: para evitar data leakage (es lo que se predice)."),
+        ("¿Qué métrica es la más adecuada para este caso?",
+         "Hay dos lecturas complementarias. AUC-ROC: evalúa la calidad del RANKING completo, independiente del umbral; útil porque el score se puede leer a distintos cortes según la capacidad operativa de la cátedra. RECALL sobre la clase positiva (riesgo): para el umbral elegido, importa cuántos casos de riesgo real se detectan; un recall del 70-80 % es el objetivo operativo. Accuracy NO es la mejor porque la clase está desbalanceada (~25 % positivos): predecir 'siempre 0' daría 75 % accuracy y sería inútil."),
+        ("¿Es más grave un falso positivo o un falso negativo?",
+         "FALSO NEGATIVO es claramente más grave en este dominio. FN: el score dice 'sin riesgo' y el alumno termina desaprobando; costo: oportunidad perdida de ayudar, impacto académico real. FP: el score dice 'riesgo' y el alumno aprueba; costo: una entrevista innecesaria del tutor (bajo, reversible). Por eso se prioriza RECALL sobre precision al elegir el umbral."),
+        ("¿El score es estable ante pequeños cambios en los datos?",
+         "Indicadores de estabilidad observados: AUC en CV (5 folds, train) ≈ AUC en test → no hay sobreajuste fuerte. Score por reglas y score por modelo correlacionan fuertemente pese a construirse de forma totalmente distinta → señal consistente. La tasa real de bajo desempeño crece monotónicamente con el nivel. Limitación: n = 200 es chico; con otra cohorte podría haber variación, por eso se recomienda recalibrar el umbral en cada cuatrimestre."),
+        ("¿El dataset puede contener sesgos que afecten el score?",
+         "Sí, varios. Variables autodeclaradas: hours_studied y sleep_hours dependen de la honestidad del estudiante (sesgo de respuesta). Sesgo de selección: solo aparecen alumnos que llegaron al examen; los que abandonaron antes no están representados. Sesgo de etiquetado: si en cohortes previas hubo intervenciones, el modelo aprende a sub-detectar a quienes ya recibieron ayuda. Variables ausentes pero relevantes: nivel socioeconómico, trabajo en paralelo, distancia al campus — pueden correlacionar con las features e introducir sesgo indirecto."),
+        ("¿Cómo se podría explicar el score a una persona no técnica?",
+         "Usando lenguaje natural y los valores propios del alumno: 'Tu score combina cuatro señales: cuánto estudiás (40 %), tu trayectoria previa (30 %), tu asistencia (20 %) y tus horas de sueño (10 %). En tu caso, estudiás X horas y asistís al Y %, eso te ubica en nivel Z. Si aumentás horas de estudio y asistencia (las dos variables más controlables a corto plazo), el score baja.' Cada estudiante debería poder pedir este detalle (derecho a la explicación)."),
+        ("¿Qué controles deberían existir antes de implementarlo en producción?",
+         "TÉCNICOS: validación con otra cohorte, monitoreo de drift, pruebas de fairness por carrera / sede / turno, recalibración periódica. HUMANOS: el score ASISTE, NO DECIDE — todo caso pasa por un tutor que puede sobrescribir el nivel; auditoría manual de 'Crítico'. ÉTICOS Y NORMATIVOS: consentimiento informado, derecho a no participar, transparencia sobre qué variables se usan, vía formal para impugnar el nivel asignado. EXCLUSIONES EXPLÍCITAS: nunca incorporar género, edad, etnia, nacionalidad ni nivel socioeconómico como features."),
+    ]
+    for _preg, _resp in _preguntas_orientadoras_qa:
+        p_q = _DOC.add_paragraph()
+        run_q = p_q.add_run("Pregunta: ")
+        run_q.bold = True
+        p_q.add_run(_preg)
+        p_a = _DOC.add_paragraph()
+        run_a = p_a.add_run("Respuesta: ")
+        run_a.bold = True
+        p_a.add_run(_resp)
+        _DOC.add_paragraph()
 
     # ── 1. DEFINICIÓN DEL PROBLEMA ──────────────────────────────────────
     pagina_titulo(pdf, "1. Definición del problema")
