@@ -150,7 +150,7 @@ df["nivel_modelo"] = df["score_modelo"].apply(asignar_nivel)
 
 
 # ── Scores adicionales derivados ────────────────────────────────────────────
-print("[3.5/4] Calculando 8 scores adicionales...")
+print("[3.5/4] Calculando 9 scores adicionales...")
 
 # 1) Score de desempeño (inverso del riesgo)
 df["score_desempeno"] = (100 - df["score_reglas"]).round(2)
@@ -413,125 +413,91 @@ with PdfPages(_pdf_out) as pdf:
     # ── CONSIGNA DEL TP ─────────────────────────────────────────────────
     pagina_titulo(pdf, "Consigna del TP")
 
-    pagina_texto(pdf, "6. Actividades que deberán realizar", [
-        " 1. Definir el problema de negocio o académico que se quiere apoyar con un",
-        "    score.",
-        " 2. Identificar la unidad de análisis (cliente, estudiante, transacción, etc.).",
-        " 3. Determinar qué significa el score (ej. probabilidad de fraude, riesgo de",
-        "    abandono, propensión a comprar).",
-        " 4. Explorar el dataset propuesto: estadísticas descriptivas, valores faltantes,",
-        "    correlaciones.",
-        " 5. Limpiar y transformar los datos (codificación, normalización si",
-        "    corresponde).",
-        " 6. Construir variables derivadas que aporten información al score.",
-        " 7. Diseñar un scoring basado en reglas o pesos (por ejemplo, mediante",
-        "    combinación lineal o reglas if-then).",
-        " 8. Definir niveles de score (bajo / medio / alto / crítico) y su",
-        "    interpretación.",
-        " 9. Asociar acciones sugeridas a cada nivel (ej. ofrecer descuento, llamar",
-        "    al cliente, alertar al docente, recomendar tutoría).",
-        "10. Implementar un modelo simple con scikit-learn (por ejemplo, regresión",
-        "    logística o árbol de decisión) para estimar una probabilidad y compararla",
-        "    con el score de reglas.",
-        "11. Comparar el scoring por reglas y el scoring por modelo, analizando sus",
-        "    diferencias.",
-        "12. Evaluar el modelo con métricas básicas: matriz de confusión, accuracy,",
-        "    precision, recall, F1, AUC.",
-        "13. Reflexionar sobre los falsos positivos y falsos negativos en el contexto",
-        "    elegido.",
-        "14. Visualizar la distribución de los scores y los niveles obtenidos.",
-        "15. Presentar conclusiones, limitaciones y propuestas de mejora.",
-    ])
+    pagina_titulo(pdf, "6. Actividades — preguntas y respuestas")
 
-    pagina_texto(pdf, "Respuestas — Actividades (1 a 5)", [
-        "1. PROBLEMA: detectar en forma temprana a estudiantes con riesgo de bajo",
-        "   desempeño académico para activar tutorías ANTES del examen final.",
-        "   No se busca predecir la nota: se busca priorizar la intervención.",
-        "",
-        "2. UNIDAD DE ANÁLISIS: el estudiante (una fila = un alumno por cursada).",
-        "   El score se calcula por alumno, no por examen ni por materia.",
-        "",
-        "3. SIGNIFICADO DEL SCORE: probabilidad/propensión de tener BAJO DESEMPEÑO",
-        "   académico (exam_score < 60). Valor entre 0 y 100: a mayor score,",
-        "   mayor riesgo estimado. El score es ordinal, no una nota.",
-        "",
-        "4. EDA: dataset de 200 alumnos, sin nulos. Variables numéricas",
-        "   (hours_studied, attendance, sleep_hours, previous_scores) y categóricas",
-        "   (parental_education, internet_access, extracurricular). Correlaciones",
-        "   con exam_score: hours_studied r=0.78, attendance r=0.65,",
-        "   previous_scores r=0.58, sleep_hours r=0.21. Clase positiva ~25 %.",
-        "",
-        "5. LIMPIEZA Y TRANSFORMACIÓN: no hubo imputaciones (no había NaN).",
-        "   Para el modelo: StandardScaler sobre las numéricas, split 70/30",
-        "   estratificado, random_state=42. Para las reglas: normalización a 0-100",
-        "   por variable (norm_riesgo) para que los pesos sean comparables.",
-    ])
-
-    pagina_texto(pdf, "Respuestas — Actividades (6 a 10)", [
-        "6. VARIABLES DERIVADAS:",
-        "   • norm_riesgo de hours_studied, attendance, previous_scores, sleep_hours",
-        "     (invertidas: menos = más riesgo) llevadas a escala 0-100.",
-        "   • score_reglas: combinación lineal con pesos 40/30/20/10.",
-        "   • nivel_riesgo: categorización del score en 4 tramos.",
-        "   • score_modelo: probabilidad predicha por Regresión Logística.",
-        "",
-        "7. SCORING BASADO EN REGLAS (combinación lineal de pesos):",
-        "   score = 0.40·riesgo_horas + 0.30·riesgo_asistencia",
-        "         + 0.20·riesgo_notas_previas + 0.10·riesgo_sueño",
-        "   Los pesos replican el orden de las correlaciones observadas en el EDA.",
-        "",
-        "8. NIVELES DE SCORE (umbrales validados empíricamente):",
-        "   • BAJO  (0-30):  sin alerta, seguimiento habitual.",
-        "   • MEDIO (30-50): atención del docente, monitoreo.",
-        "   • ALTO  (50-70): tutoría recomendada.",
-        "   • CRÍTICO (70-100): intervención inmediata del coordinador.",
-        "",
-        "9. ACCIONES SUGERIDAS POR NIVEL:",
-        "   • Bajo: ninguna acción especial.",
-        "   • Medio: recordatorios, recursos de estudio adicionales.",
-        "   • Alto: convocar a tutoría, contactar a la familia.",
-        "   • Crítico: reunión con coordinador + plan de recuperación.",
-        "",
-        "10. MODELO PREDICTIVO (scikit-learn):",
-        "    • Regresión Logística (interpretable, baseline).",
-        "    • Random Forest (compara desempeño no lineal).",
-        "    • Target binario: riesgo_bajo_desempeno = (exam_score < 60).",
-        "    • exam_score se EXCLUYE de las features para evitar data leakage.",
-    ])
-
-    pagina_texto(pdf, "Respuestas — Actividades (11 a 15)", [
-        "11. COMPARACIÓN REGLAS vs MODELO:",
-        "    • Ambos rankean a los alumnos de forma muy similar (corr. alta).",
-        "    • El score por reglas es totalmente transparente y auditable.",
-        "    • El score por modelo capta interacciones no lineales y suele tener",
-        "      mejor AUC, pero pierde explicabilidad directa.",
-        "    • Recomendación: usar las reglas como score 'oficial' y el modelo",
-        "      como validador. Si ambos coinciden en CRÍTICO → alta confianza.",
-        "",
-        "12. MÉTRICAS DE EVALUACIÓN:",
-        f"    • AUC-ROC LR ≈ {auc_lr:.3f}  |  AUC-ROC RF ≈ {auc_rf:.3f}.",
-        "    • Recall priorizado (no perder alumnos en riesgo real).",
-        "    • Accuracy NO es buena métrica (clase desbalanceada ~25 %).",
-        "    • Matriz de confusión, precision y F1 también reportadas.",
-        "",
-        "13. FALSOS POSITIVOS vs FALSOS NEGATIVOS:",
-        "    • FN (decir 'sin riesgo' y desaprobar): MUY GRAVE — alumno sin ayuda.",
-        "    • FP (decir 'riesgo' y aprobar): leve — una tutoría 'de más'.",
-        "    • Por eso el umbral se elige para MAXIMIZAR RECALL aceptando algo",
-        "      más de FP. El costo asimétrico justifica priorizar sensibilidad.",
-        "",
-        "14. VISUALIZACIONES INCLUIDAS EN ESTE REPORTE:",
-        "    • Histograma de score_reglas y score_modelo.",
-        "    • Distribución por nivel de riesgo (bajo/medio/alto/crítico).",
-        "    • Curva ROC, matriz de confusión, scatter reglas vs modelo.",
-        "",
-        "15. CONCLUSIONES, LIMITACIONES Y MEJORAS:",
-        "    • Conclusión: ambos enfoques son consistentes y útiles como alerta",
-        "      temprana antes del examen final.",
-        "    • Limitaciones: n=200, una sola cohorte, variables autodeclaradas.",
-        "    • Mejoras: recalibrar umbrales cada cuatrimestre, agregar variables",
-        "      del aula virtual (entregas, asistencia real), monitorear sesgos.",
-    ])
+    _actividades_qa = [
+        ("1. Definir el problema de negocio o académico que se quiere apoyar con un score.",
+         "Detectar en forma temprana a estudiantes con riesgo de bajo desempeño académico "
+         "para activar tutorías ANTES del examen final. No se busca predecir la nota: "
+         "se busca priorizar la intervención."),
+        ("2. Identificar la unidad de análisis (cliente, estudiante, transacción, etc.).",
+         "El estudiante (una fila = un alumno por cursada). El score se calcula por alumno, "
+         "no por examen ni por materia."),
+        ("3. Determinar qué significa el score (ej. probabilidad de fraude, riesgo de abandono, "
+         "propensión a comprar).",
+         "Probabilidad/propensión de tener BAJO DESEMPEÑO académico (exam_score < 60). "
+         "Valor entre 0 y 100: a mayor score, mayor riesgo estimado. El score es ordinal, "
+         "no una nota."),
+        ("4. Explorar el dataset propuesto: estadísticas descriptivas, valores faltantes, "
+         "correlaciones.",
+         "Dataset de 200 alumnos, sin nulos. Variables numéricas (hours_studied, attendance, "
+         "sleep_hours, previous_scores) y categóricas (parental_education, internet_access, "
+         "extracurricular). Correlaciones con exam_score: hours_studied r=0.78, attendance "
+         "r=0.65, previous_scores r=0.58, sleep_hours r=0.21. Clase positiva ~25 %."),
+        ("5. Limpiar y transformar los datos (codificación, normalización si corresponde).",
+         "No hubo imputaciones (no había NaN). Para el modelo: StandardScaler sobre las "
+         "numéricas, split 70/30 estratificado, random_state=42. Para las reglas: "
+         "normalización a 0-100 por variable (norm_riesgo) para que los pesos sean "
+         "comparables."),
+        ("6. Construir variables derivadas que aporten información al score.",
+         "norm_riesgo de hours_studied, attendance, previous_scores y sleep_hours "
+         "(invertidas: menos = más riesgo) llevadas a escala 0-100. score_reglas: "
+         "combinación lineal con pesos 40/30/20/10. nivel_riesgo: categorización del score "
+         "en 4 tramos. score_modelo: probabilidad predicha por Regresión Logística."),
+        ("7. Diseñar un scoring basado en reglas o pesos (combinación lineal o reglas if-then).",
+         "score = 0.40·riesgo_horas + 0.30·riesgo_asistencia + 0.20·riesgo_notas_previas "
+         "+ 0.10·riesgo_sueño. Los pesos replican el orden de las correlaciones observadas "
+         "en el EDA."),
+        ("8. Definir niveles de score (bajo / medio / alto / crítico) y su interpretación.",
+         "BAJO (0-30): sin alerta, seguimiento habitual. MEDIO (30-50): atención del "
+         "docente, monitoreo. ALTO (50-70): tutoría recomendada. CRÍTICO (70-100): "
+         "intervención inmediata del coordinador. Umbrales validados empíricamente."),
+        ("9. Asociar acciones sugeridas a cada nivel (descuento, llamar al cliente, alertar "
+         "al docente, recomendar tutoría).",
+         "Bajo: ninguna acción especial. Medio: recordatorios, recursos de estudio "
+         "adicionales. Alto: convocar a tutoría, contactar a la familia. Crítico: reunión "
+         "con coordinador + plan de recuperación."),
+        ("10. Implementar un modelo simple con scikit-learn (regresión logística o árbol de "
+         "decisión) para estimar una probabilidad y compararla con el score de reglas.",
+         "Regresión Logística (interpretable, baseline) y Random Forest (compara desempeño "
+         "no lineal). Target binario: riesgo_bajo_desempeno = (exam_score < 60). "
+         "exam_score se EXCLUYE de las features para evitar data leakage."),
+        ("11. Comparar el scoring por reglas y el scoring por modelo, analizando sus diferencias.",
+         "Ambos rankean a los alumnos de forma muy similar (correlación alta). El score "
+         "por reglas es totalmente transparente y auditable. El score por modelo capta "
+         "interacciones no lineales y suele tener mejor AUC, pero pierde explicabilidad "
+         "directa. Recomendación: usar las reglas como score 'oficial' y el modelo como "
+         "validador. Si ambos coinciden en CRÍTICO → alta confianza."),
+        ("12. Evaluar el modelo con métricas básicas: matriz de confusión, accuracy, "
+         "precision, recall, F1, AUC.",
+         f"AUC-ROC LR ≈ {auc_lr:.3f} | AUC-ROC RF ≈ {auc_rf:.3f}. Recall priorizado "
+         "(no perder alumnos en riesgo real). Accuracy NO es buena métrica (clase "
+         "desbalanceada ~25 %). Matriz de confusión, precision y F1 también reportadas."),
+        ("13. Reflexionar sobre los falsos positivos y falsos negativos en el contexto elegido.",
+         "FN (decir 'sin riesgo' y desaprobar): MUY GRAVE — alumno sin ayuda. FP (decir "
+         "'riesgo' y aprobar): leve — una tutoría 'de más'. Por eso el umbral se elige "
+         "para MAXIMIZAR RECALL aceptando algo más de FP. El costo asimétrico justifica "
+         "priorizar sensibilidad."),
+        ("14. Visualizar la distribución de los scores y los niveles obtenidos.",
+         "Visualizaciones incluidas en el PDF: histograma de score_reglas y score_modelo, "
+         "distribución por nivel de riesgo (bajo/medio/alto/crítico), curva ROC, matriz de "
+         "confusión y scatter reglas vs modelo."),
+        ("15. Presentar conclusiones, limitaciones y propuestas de mejora.",
+         "Conclusión: ambos enfoques son consistentes y útiles como alerta temprana antes "
+         "del examen final. Limitaciones: n=200, una sola cohorte, variables autodeclaradas. "
+         "Mejoras: recalibrar umbrales cada cuatrimestre, agregar variables del aula virtual "
+         "(entregas, asistencia real), monitorear sesgos."),
+    ]
+    for _preg, _resp in _actividades_qa:
+        p_q = _DOC.add_paragraph()
+        run_q = p_q.add_run("Pregunta: ")
+        run_q.bold = True
+        p_q.add_run(_preg)
+        p_a = _DOC.add_paragraph()
+        run_a = p_a.add_run("Respuesta: ")
+        run_a.bold = True
+        p_a.add_run(_resp)
+        _DOC.add_paragraph()
 
     pagina_titulo(pdf, "7. Preguntas orientadoras para profundizar")
 
@@ -1271,7 +1237,7 @@ with PdfPages(_pdf_out) as pdf:
         for idx in desc_nuevos.index
     ]
     render_tabla(pdf, data, ["score", "media", "std", "min", "p25", "p50", "p75", "max"],
-                 "Estadísticos descriptivos de los 8 scores adicionales",
+                 "Estadísticos descriptivos de los 9 scores adicionales",
                  col_widths=[0.22] + [0.10] * 7, fontsize=8.5)
 
     # Niveles y acciones
